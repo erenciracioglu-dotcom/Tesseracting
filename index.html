@@ -1,0 +1,1320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="A toy for feeling your way around four dimensions: a ball bouncing inside a turning tesseract, seen from outside and through its own eyes.">
+<meta property="og:title" content="Tesseracting">
+<meta property="og:description" content="A toy for feeling your way around four dimensions: a ball bouncing inside a turning tesseract, seen from outside and through its own eyes.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://erenciracioglu-dotcom.github.io/Tesseracting/">
+<meta name="theme-color" content="#04050b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%23f2d49b' stroke-width='2'%3E%3Crect x='3' y='3' width='26' height='26'/%3E%3Crect x='10' y='10' width='12' height='12'/%3E%3Cpath d='M3 3l7 7M29 3l-7 7M3 29l7-7M29 29l-7-7'/%3E%3C/g%3E%3C/svg%3E">
+<title>Tesseracting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;600&family=Major+Mono+Display&display=swap">
+<style>
+  :root{
+    color-scheme:dark;
+    --void:#04050b; --ink:#e7eaf3; --dim:#8a91aa; --line:rgba(231,234,243,.15);
+    --glass:rgba(9,11,22,.8); --gold:#f2d49b; --ana:#52b6ff; --kata:#ff5470;
+  }
+  html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:hidden}
+  body{font-family:"Jura",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+  #stage{position:relative;flex:1 1 auto;min-height:0}
+  #gl,#hud{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #gl{touch-action:none;cursor:grab}
+  #gl:active{cursor:grabbing}
+  #hud{pointer-events:none}
+  .divider{position:absolute;background:var(--line);pointer-events:none}
+  .pane-label{position:absolute;display:flex;flex-direction:column;gap:3px;pointer-events:none;max-width:calc(50% - 32px)}
+  .pane-label b{font-family:"Major Mono Display",ui-monospace,monospace;font-weight:400;font-size:15px;letter-spacing:.02em;color:var(--ink)}
+  .pane-label span{font-size:12px;color:var(--dim);letter-spacing:.04em}
+
+  #panel{flex:0 0 auto;border-top:1px solid var(--line);background:var(--glass);padding-inline:16px;padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));
+    display:flex;flex-direction:column;gap:8px}
+  .prow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 26px}
+  .group{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .glabel{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-right:4px}
+  .chip{appearance:none;font:inherit;font-size:12.5px;letter-spacing:.05em;color:var(--dim);background:transparent;border:1px solid var(--line);
+    border-radius:2px;padding:6px 10px;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
+  .chip.mono{font-family:"Major Mono Display",ui-monospace,monospace;letter-spacing:0;font-size:13px;padding:5px 9px}
+  .chip:hover,.chip:focus-visible{color:var(--ink);border-color:rgba(231,234,243,.45);outline:none}
+  .chip[aria-pressed="true"]{color:var(--ink);border-color:var(--gold);background:rgba(242,212,155,.08)}
+  .chip.tog::before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border:1px solid currentColor;border-radius:1px;vertical-align:1px;opacity:.75}
+  .chip.tog[aria-pressed="true"]::before{background:var(--gold);border-color:var(--gold);opacity:1}
+  .chip.act{color:var(--void);background:var(--gold);border-color:var(--gold);font-weight:600}
+  .chip.act:hover,.chip.act:focus-visible{background:#fff;border-color:#fff;color:var(--void)}
+  .readout{font-size:12.5px;color:var(--gold)}
+  input[type=range]{width:96px;accent-color:#f2d49b}
+  .hint{margin:0;font-size:12px;color:var(--dim);line-height:1.6;flex:1 1 300px}
+  .hint kbd{font-family:"Major Mono Display",ui-monospace,monospace;font-size:11px;color:var(--ink);border:1px solid var(--line);border-radius:2px;padding:0 4px}
+  #hidePanel{margin-left:auto}
+  .fly-only{display:none} body.flying .fly-only{display:inline} body.flying .look-only{display:none}
+  #showPanel{position:absolute;right:12px;bottom:12px;display:none;background:var(--glass)}
+  body.collapsed #panel{display:none}
+  body.collapsed #showPanel{display:inline-block}
+  #toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);font-family:"Major Mono Display",ui-monospace,monospace;font-size:14px;color:var(--ink);
+    background:var(--glass);border:1px solid var(--line);padding:6px 12px;border-radius:2px;opacity:0;transition:opacity .5s;pointer-events:none;white-space:nowrap}
+  #err{position:absolute;left:16px;top:16px;color:var(--kata)}
+  [hidden]{display:none!important}
+  .credits{font-size:11.5px;color:var(--dim);letter-spacing:.03em;gap:6px 12px}
+  .credits a,.about-card a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}
+  .credits a:hover,.credits a:focus-visible,.about-card a:hover,.about-card a:focus-visible{border-color:var(--gold);outline:none}
+  .linkish{appearance:none;background:none;border:0;border-bottom:1px solid rgba(242,212,155,.35);padding:0;font:inherit;color:var(--gold);cursor:pointer}
+  .linkish:hover,.linkish:focus-visible{border-color:var(--gold);outline:none}
+  #about{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding-inline:16px;padding-block:24px;
+    background:rgba(4,5,11,.66);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  .about-card{width:100%;max-width:440px;background:#0b0d19;border:1px solid var(--line);border-radius:3px;padding:22px 24px 20px;display:flex;flex-direction:column;gap:12px}
+  .about-card h2{margin:0;font-family:"Major Mono Display",ui-monospace,monospace;font-weight:400;font-size:22px}
+  .about-card p{margin:0;font-size:14px;line-height:1.6;color:var(--ink)}
+  .about-card .who{font-size:13px;color:var(--dim)}
+  .about-card .chip{align-self:flex-start}
+  @media (max-width:700px){ .hint{display:none} .prow{gap:8px 16px} #panel{max-height:46vh;overflow-y:auto} }
+  @media (prefers-reduced-motion:reduce){ .chip{transition:none} }
+</style>
+
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <canvas id="hud"></canvas>
+  <div class="divider" id="divider"></div>
+  <div class="pane-label" id="labO"><b id="title">eight walls</b><span id="stillTxt">turning in xw · still plane yz</span></div>
+  <div class="pane-label" id="labI"><b id="eyesTitle">the ball's eyes</b><span id="modeTxt">free look</span></div>
+  <div id="toast"></div>
+  <button class="chip" type="button" id="showPanel">Controls</button>
+</div>
+
+<div id="panel">
+  <div class="prow">
+    <div class="group" id="shapes">
+      <span class="glabel">Shape</span>
+      <button class="chip" type="button" data-shape="tesseract" aria-pressed="true">Tesseract</button>
+      <button class="chip" type="button" data-shape="hexhex" aria-pressed="false">Hexagon × hexagon</button>
+    </div>
+    <div class="group" id="planes"><span class="glabel">Turns in</span></div>
+    <div class="group">
+      <span class="glabel">Spin</span>
+      <input type="range" id="spin" min="0" max="2.5" step="0.05" value="0.6" aria-label="Spin speed">
+    </div>
+    <button class="chip" type="button" id="hidePanel">Hide controls</button>
+  </div>
+  <div class="prow">
+    <div class="group" id="modes">
+      <span class="glabel">Eyes</span>
+      <button class="chip" type="button" data-mode="free" aria-pressed="true">Free look</button>
+      <button class="chip" type="button" data-mode="prograde" aria-pressed="false">Along its path</button>
+      <button class="chip" type="button" data-mode="ride" aria-pressed="false">Ride with the walls</button>
+      <button class="chip" type="button" data-mode="fly" aria-pressed="false">Free fly</button>
+      <button class="chip tog" type="button" id="link" aria-pressed="true">Outside view follows eyes</button>
+    </div>
+    <div class="group">
+      <span class="glabel">Time</span>
+      <button class="chip tog" type="button" id="pause" aria-pressed="false" title="Key P">Pause</button>
+      <button class="chip tog" type="button" id="slow" aria-pressed="false">Slow motion</button>
+      <button class="chip tog" type="button" id="bullet" aria-pressed="false">Slow at bounces</button>
+    </div>
+    <div class="group">
+      <span class="glabel">Ball</span>
+      <input type="range" id="speed" min="0.3" max="3" step="0.05" value="1.1" aria-label="Ball speed">
+      <button class="chip act" type="button" id="kick">Kick</button>
+    </div>
+  </div>
+  <div class="prow">
+    <div class="group" id="layers">
+      <span class="glabel">Show</span>
+      <button class="chip tog" type="button" data-layer="shadows" aria-pressed="false" title="Key 1">Flat shadows</button>
+      <button class="chip tog" type="button" data-layer="room" aria-pressed="false" title="Key 2">Ball's room</button>
+      <button class="chip tog" type="button" data-layer="markers" aria-pressed="false" title="Key 3">Wall markers</button>
+      <button class="chip tog" type="button" data-layer="ghost" aria-pressed="false" title="Key 4">Ana/kata sight</button>
+      <button class="chip tog" type="button" data-layer="hum" aria-pressed="false" title="Key 5">Wall hum</button>
+      <button class="chip tog" type="button" data-layer="cone" aria-pressed="false" title="Key 6">View cone</button>
+      <button class="chip tog" type="button" data-layer="chairs" aria-pressed="false" title="Key 7">Chairs</button>
+    </div>
+    <div class="group"><button class="chip" type="button" id="sound" aria-pressed="false">Sound off</button></div>
+    <p class="hint"><span class="look-only">Drag either view to look around · <kbd>shift</kbd> or right drag: look into the fourth direction · </span><span class="fly-only"><kbd>w</kbd><kbd>a</kbd><kbd>s</kbd><kbd>d</kbd> fly · <kbd>r</kbd>/<kbd>f</kbd> up and down · <kbd>e</kbd>/<kbd>q</kbd> slide ana/kata · drag to look · <kbd>shift</kbd> drag: turn into the fourth direction · </span><kbd>space</kbd> kick · <kbd>p</kbd> pause · <kbd>1</kbd>–<kbd>7</kbd> layers</p>
+  </div>
+  <div class="prow credits">
+    <span>Made by Faruk Eren Ciracioglu with Claude Opus 5.5 · <a href="mailto:erenciracioglu@gmail.com">erenciracioglu@gmail.com</a></span>
+    <button class="linkish" type="button" id="aboutBtn">About</button>
+  </div>
+</div>
+
+<div id="about" hidden>
+  <div class="about-card" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <h2 id="aboutTitle">tesseracting</h2>
+    <p>A small toy for feeling your way around four dimensions. A ball bounces weightless inside a tesseract that turns in a plane. Watch it from outside, look through the ball's own eyes, and switch on the layers one at a time as you get curious.</p>
+    <p class="who">Made by Faruk Eren Ciracioglu with Claude Opus 5.5.<br>Contact: <a href="mailto:erenciracioglu@gmail.com">erenciracioglu@gmail.com</a></p>
+    <p class="who">MIT licensed · <a href="https://github.com/erenciracioglu-dotcom/Tesseracting" target="_blank" rel="noopener">Source on GitHub</a></p>
+    <button class="chip" type="button" id="aboutClose">Close</button>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ================================================================ 4D math */
+const I4 = () => [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+function rot(i,j,a){ const m=I4(), c=Math.cos(a), s=Math.sin(a); m[i*4+i]=c; m[j*4+j]=c; m[i*4+j]=-s; m[j*4+i]=s; return m; }
+function mul(A,B){ const r=new Array(16).fill(0); for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=A[i*4+k]*B[k*4+j];r[i*4+j]=s;} return r; }
+const ap = (M,v) => [0,1,2,3].map(i => M[i*4]*v[0]+M[i*4+1]*v[1]+M[i*4+2]*v[2]+M[i*4+3]*v[3]);
+const apT = (M,v) => [0,1,2,3].map(i => M[i]*v[0]+M[4+i]*v[1]+M[8+i]*v[2]+M[12+i]*v[3]);
+const dot = (a,b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2]+a[3]*b[3];
+const sub = (a,b) => [a[0]-b[0],a[1]-b[1],a[2]-b[2],a[3]-b[3]];
+const addS = (a,b,s) => [a[0]+b[0]*s,a[1]+b[1]*s,a[2]+b[2]*s,a[3]+b[3]*s];
+const len = a => Math.sqrt(dot(a,a));
+const nrm = a => { const l=len(a)||1; return a.map(x=>x/l); };
+const clamp = (x,a,b) => Math.min(b,Math.max(a,x));
+function orthoRows(M){ const r=[M.slice(0,4),M.slice(4,8),M.slice(8,12),M.slice(12,16)];
+  for(let i=0;i<4;i++){ for(let j=0;j<i;j++) r[i]=addS(r[i],r[j],-dot(r[i],r[j])); r[i]=nrm(r[i]); } return [].concat(...r); }
+function rotInPlane(v,u,w,c,s){ const a=dot(v,u), b=dot(v,w); return [0,1,2,3].map(i=>v[i]+(c-1)*(a*u[i]+b*w[i])+s*(a*w[i]-b*u[i])); }
+const AX = ['x','y','z','w'];
+
+/* ================================================================ shapes
+   Both shapes are duoprisms: a polygon in the xw plane times a polygon in the yz plane.
+   A tesseract is square × square. The hexagon version is hexagon × hexagon.            */
+const B = 1.0, RB = 0.17, LIM = B - RB, MAXC = 12;
+const SHAPES = {
+  tesseract:{ p:4, q:4,
+    names:['+x','+w','−x','−w','+y','+z','−y','−z'],
+    hex:['#ff6b5e','#c47bff','#ffb03b','#ff5fb0','#c6f25a','#45c8ff','#35e0a1','#6f7bff'],
+    notes:[523.25,783.99,392.00,329.63,587.33,659.25,440.00,493.88] },
+  hexhex:{ p:6, q:6,
+    names:['a1','a2','a3','a4','a5','a6','b1','b2','b3','b4','b5','b6'],
+    hex:['#ffd23f','#ffa03c','#ff6b5e','#ff4f8b','#d56bff','#9d7bff','#c6f25a','#6ee06a','#35e0a1','#3fd6e0','#45a8ff','#6f7bff'],
+    notes:[392.00,440.00,523.25,587.33,659.25,783.99,196.00,220.00,261.63,293.66,329.63,392.00] },
+};
+// A chair in every cell: a familiar object with an up, a front, and one armrest on its right, so a mirror image shows.
+// Chair coordinates: x right, y up, z forward (its front). Boxes as centre and half-size.
+const CHAIR = [
+  { c:[0, 0, 0.02],         h:[0.25, 0.03, 0.23] },   // seat
+  { c:[-0.21, -0.2, 0.21],  h:[0.025, 0.17, 0.025] }, // front legs
+  { c:[ 0.21, -0.2, 0.21],  h:[0.025, 0.17, 0.025] },
+  { c:[-0.21, -0.2, -0.17], h:[0.025, 0.17, 0.025] }, // back legs
+  { c:[ 0.21, -0.2, -0.17], h:[0.025, 0.17, 0.025] },
+  { c:[0, 0.26, -0.18],     h:[0.25, 0.23, 0.025] },  // backrest
+  { c:[0.235, 0.15, 0.03],  h:[0.02, 0.02, 0.19] },   // armrest, right side only
+  { c:[0.235, 0.075, 0.19], h:[0.018, 0.055, 0.018] } // its post
+];
+const chairShade = c => c.map(v => v*0.88 + 0.1); // each chair: its own cell's colour, a touch lighter
+const chairInside = p => CHAIR.some(b => Math.abs(p[0]-b.c[0]) <= b.h[0] && Math.abs(p[1]-b.c[1]) <= b.h[1] && Math.abs(p[2]-b.c[2]) <= b.h[2]);
+const f3 = a => `vec3(${a.map(v => v.toFixed(3)).join(',')})`;
+const CHAIR_GLSL = `float sdBox3(vec3 p, vec3 c, vec3 h){ vec3 d = abs(p - c) - h; return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0); }
+float chairSDF(vec3 p){
+  float d = 1e9;
+${CHAIR.map(b => `  d = min(d, sdBox3(p, ${f3(b.c)}, ${f3(b.h)}));`).join('\n')}
+  return d;
+}`;
+function det4(a, b, c, d){
+  const m = [a,b,c,d].map(v => v.slice()); let det = 1;
+  for (let i=0;i<4;i++){
+    let pv = i; for (let r=i+1;r<4;r++) if (Math.abs(m[r][i]) > Math.abs(m[pv][i])) pv = r;
+    if (Math.abs(m[pv][i]) < 1e-12) return 0;
+    if (pv !== i){ [m[pv], m[i]] = [m[i], m[pv]]; det = -det; }
+    det *= m[i][i];
+    for (let r=i+1;r<4;r++){ const f = m[r][i]/m[i][i]; for (let k=i;k<4;k++) m[r][k] -= f*m[i][k]; }
+  }
+  return det;
+}
+function cellFrame(N){ // right, up, forward inside a cell: up as close to world up as the cell allows, same handedness everywhere
+  const X=[1,0,0,0], Y=[0,1,0,0], Z=[0,0,1,0], Wv=[0,0,0,1], inCell = v => addS(v, N, -dot(v, N));
+  let u = inCell(Y); if (len(u) < 0.3) u = inCell(Wv); u = nrm(u);
+  let f = null;
+  for (const v of [Z, X, Wv, Y]){ let c = inCell(v); c = addS(c, u, -dot(c, u)); if (len(c) > 0.3){ f = nrm(c); break; } }
+  let r = null;
+  for (const v of [X, Z, Wv, Y]){ let c = inCell(v); c = addS(c, u, -dot(c, u)); c = addS(c, f, -dot(c, f)); if (len(c) > 0.3){ r = nrm(c); break; } }
+  if (det4(r, u, f, N) < 0) r = r.map(x => -x);
+  return { r, u, f };
+}
+function makeDuoprism(p, q){
+  const r1 = B/Math.cos(Math.PI/p), r2 = B/Math.cos(Math.PI/q);
+  const P1 = Array.from({length:p}, (_,i) => { const a = 2*Math.PI*i/p + Math.PI/p; return [r1*Math.cos(a), r1*Math.sin(a)]; });
+  const P2 = Array.from({length:q}, (_,j) => { const a = 2*Math.PI*j/q + Math.PI/q; return [r2*Math.cos(a), r2*Math.sin(a)]; });
+  const vid = (i,j) => (((i%p)+p)%p)*q + (((j%q)+q)%q);
+  const V = [];
+  for (let i=0;i<p;i++) for (let j=0;j<q;j++) V.push([P1[i][0], P2[j][0], P2[j][1], P1[i][1]]);
+  const cells = [];
+  for (let k=0;k<p;k++){ const f=2*Math.PI*k/p, c=Math.cos(f), s=Math.sin(f); cells.push({ N:[c,0,0,s], T:[-s,0,0,c], pl:0, faces:[] }); }
+  for (let m=0;m<q;m++){ const f=2*Math.PI*m/q, c=Math.cos(f), s=Math.sin(f); cells.push({ N:[0,c,s,0], T:[0,-s,c,0], pl:1, faces:[] }); }
+  const E = [];
+  for (let k=0;k<p;k++){ const a=k-1, b=k, cell=cells[k];
+    cell.faces.push(Array.from({length:q},(_,j)=>vid(a,j)), Array.from({length:q},(_,j)=>vid(b,j)));
+    for (let m=0;m<q;m++) cell.faces.push([vid(a,m-1), vid(a,m), vid(b,m), vid(b,m-1)]);
+    for (let j=0;j<q;j++) E.push({ a:vid(a,j), b:vid(b,j), cells:[k, p+j, p+((j+1)%q)] });
+  }
+  for (let m=0;m<q;m++){ const c=m-1, d=m, cell=cells[p+m];
+    cell.faces.push(Array.from({length:p},(_,i)=>vid(i,c)), Array.from({length:p},(_,i)=>vid(i,d)));
+    for (let k=0;k<p;k++) cell.faces.push([vid(k-1,c), vid(k,c), vid(k,d), vid(k-1,d)]);
+    for (let i=0;i<p;i++) E.push({ a:vid(i,c), b:vid(i,d), cells:[p+m, i, (i+1)%p] });
+  }
+  cells.forEach(c => { c.verts = [...new Set(c.faces.flat())]; const fr = cellFrame(c.N); c.CR = fr.r; c.CU = fr.u; c.CF = fr.f; });
+  return { p, q, V, E, cells, vmax:Math.hypot(r1, r2) };
+}
+
+/* ================================================================ state */
+let SH, poly, CELL_RGB = [];
+const T = { R:I4(), planes:new Set(['03']), w:0.6 };
+const ball = { p:[0,0,0,0], v:[0,0,0,0], speed:1.1, trail:[], hits:0 };
+const flash = new Array(MAXC).fill(0), lastHit = new Array(MAXC).fill(-1);
+let flashAll = 0, flashCol = [1,1,1], simT = 0, gazeCell = 0;
+const layers = { shadows:false, room:false, markers:false, ghost:false, hum:false, cone:false, chairs:false };
+const LAYER_KEYS = ['shadows','room','markers','ghost','hum','cone','chairs'];
+let paused = false, slowMo = false, bullet = false, ghostAmt = 0;
+const FOCAL = 0.8, TRAIL_N = 360;
+const view = { F:[0,0,1,0], U:[0,1,0,0], R:[1,0,0,0], A:[0,0,0,1], mode:'free' };
+const FR = ['F','U','R','A'];
+const flyer = { p:[0,0,0,0], v:[0,0,0,0] }, FLY_R = 0.06;
+let linkViews = true;
+const eye = () => view.mode === 'fly' ? flyer.p : ball.p;   // where the eyes are
+const eyeR = () => view.mode === 'fly' ? FLY_R : RB;
+
+function orthoFrame(){
+  for (let i=0;i<4;i++){ for (let j=0;j<i;j++) view[FR[i]] = addS(view[FR[i]], view[FR[j]], -dot(view[FR[i]], view[FR[j]])); view[FR[i]] = nrm(view[FR[i]]); }
+}
+function turnFrameTo(target, maxStep){
+  const c0 = clamp(dot(view.F,target),-1,1), ang = Math.acos(c0);
+  if (ang < 1e-4) return;
+  let w = addS(target, view.F, -c0); if (len(w) < 1e-6) w = view.U.slice(); w = nrm(w);
+  const st = Math.min(ang, maxStep), c = Math.cos(st), s = Math.sin(st), u = view.F.slice();
+  for (const k of FR) view[k] = rotInPlane(view[k],u,w,c,s);
+  orthoFrame();
+}
+function rotPair(a,b,th){ const c=Math.cos(th), s=Math.sin(th), A=view[a], Bv=view[b];
+  view[a]=A.map((x,i)=>x*c+Bv[i]*s); view[b]=Bv.map((x,i)=>x*c-A[i]*s); }
+
+/* ================================================================ physics */
+function kick(){
+  const v = nrm([Math.random()*2-1, Math.random()*2-1, Math.random()*2-1, Math.random()*2-1]);
+  ball.v = v.map(x => x*ball.speed);
+  sound.bell(261.63, 0.12, 0);
+}
+function omegaP(p){ // velocity of the shape's material at world point p
+  const o=[0,0,0,0];
+  for (const pl of T.planes){ const i=+pl[0], j=+pl[1]; o[i] += -T.w*p[j]; o[j] += T.w*p[i]; }
+  return o;
+}
+function step(dt){
+  simT += dt;
+  let Rd = I4();
+  for (const pl of T.planes) Rd = mul(rot(+pl[0], +pl[1], T.w*dt), Rd);
+  T.R = mul(Rd, T.R);
+  if (view.mode === 'ride') for (const k of FR) view[k] = ap(Rd, view[k]);
+
+  ball.p = addS(ball.p, ball.v, dt);
+  let q = apT(T.R, ball.p), touched = false;
+  for (let pass=0; pass<2; pass++){
+    for (let id=0; id<poly.cells.length; id++){
+      const N = poly.cells[id].N, s = dot(N, q);
+      if (s <= LIM) continue;
+      q = addS(q, N, LIM - s); touched = true;
+      const n = ap(T.R, N), vw = omegaP(ap(T.R, q));
+      const vrel = sub(ball.v, vw), vn = dot(vrel, n);
+      if (vn > 0){
+        const out = addS(vrel, n, -2*vn);
+        ball.v = [out[0]+vw[0], out[1]+vw[1], out[2]+vw[2], out[3]+vw[3]];
+        if (simT - lastHit[id] > 0.07 && vn > 0.04) onHit(id, n, vn);
+        lastHit[id] = simT;
+      }
+    }
+  }
+  if (touched) ball.p = ap(T.R, q);
+  // Moving walls trade energy with the ball, but in the turning frame its energy is conserved,
+  // so speed stays bounded on its own. This only steps in if it ever strays far from the chosen speed.
+  const sp = len(ball.v);
+  if (sp < 1e-4) kick();
+  else if (sp > ball.speed*5 || sp < ball.speed*0.2) ball.v = ball.v.map(x => x*(1 + (ball.speed/sp - 1)*0.01));
+}
+function onHit(id, n, vn){
+  ball.hits++;
+  flash[id] = 1; flashAll = 1; flashCol = CELL_RGB[id];
+  sound.bell(SH.notes[id], clamp(0.05 + vn*0.07, 0.05, 0.2), clamp(dot(n, view.R), -1, 1));
+}
+function wallInfo(){ // every wall, seen from the eyes
+  const q = apT(T.R, eye()), er = eyeR();
+  return poly.cells.map((c, id) => {
+    const n = ap(T.R, c.N), d4 = B - dot(c.N, q), na = dot(n, view.A);
+    return { id, n, d4, gap:d4 - er, nr:dot(n, view.R), nu:dot(n, view.U), nf:dot(n, view.F), na, ins:Math.sqrt(Math.max(0, 1 - na*na)) };
+  });
+}
+function exitCell(dir){ // the wall a ray from the eyes meets first
+  const q0 = apT(T.R, eye()), dl = apT(T.R, dir); let tm = 1e9, id = 0;
+  poly.cells.forEach((c, i) => { const den = dot(c.N, dl); if (den > 1e-6){ const t = (B - dot(c.N, q0))/den; if (t < tm){ tm = t; id = i; } } });
+  return id;
+}
+function timeScale(info){
+  if (paused) return 0;
+  let s = slowMo ? 0.25 : 1;
+  if (bullet){ const q = apT(T.R, ball.p); let g = 1e9; for (const c of poly.cells) g = Math.min(g, B - dot(c.N, q) - RB); s *= clamp(g/0.3, 0.12, 1); }
+  return s;
+}
+
+/* ================================================================ rendering */
+const canvas = document.getElementById('gl');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' }); }
+catch(e){ document.getElementById('stage').insertAdjacentHTML('beforeend','<p id="err">This needs WebGL 2. Try a recent desktop browser.</p>'); throw e; }
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+renderer.setPixelRatio(DPR);
+renderer.setClearColor(0x04050b, 1);
+renderer.autoClear = false;
+
+/* ---------- outside: the shape's 3D shadow ---------- */
+const sceneO = new THREE.Scene();
+const camO = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+const orbit = { th:0.62, ph:0.32, dist:7.4, lastInput:-1e9 };
+const D4 = 3.1; // 4D eye distance along the projection axis
+// Linked: the shadow is cast along your own fourth axis and laid out along your right, up and forward,
+// so the outside view turns exactly as your eyes do. Unlinked: cast along world w, orbit freely.
+function proj4(p){
+  let x, y, z, w;
+  if (linkViews){ x = dot(p, view.R); y = dot(p, view.U); z = -dot(p, view.F); w = dot(p, view.A); }
+  else { x = p[0]; y = p[1]; z = p[2]; w = p[3]; }
+  const k = D4/(D4 - w); return [x*k*1.25, y*k*1.25, z*k*1.25, k];
+}
+const wOf = P => D4 - D4/P[3]; // position along the projection axis, recovered from the scale
+const NEUTRAL = [0.72, 0.76, 0.86];
+
+const cyl = new THREE.CylinderGeometry(1,1,1,10,1,true);
+const sph = new THREE.SphereGeometry(1,12,8);
+const faceMat = new THREE.MeshBasicMaterial({ vertexColors:true, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
+const edgeMat = new THREE.MeshBasicMaterial({ color:0xffffff });
+let TRIS = [], faceGeo = null, fPos = null, fCol = null, faces = null, edgeMesh = null, vertMesh = null;
+
+// the ball's room: the 3D slice it sees, drawn inside the shadow
+const ROOM_V = 12*16*3, ROOM_E = 12*16;
+const roomGeo = new THREE.BufferGeometry();
+const rPos = new Float32Array(ROOM_V*3), rCol = new Float32Array(ROOM_V*4);
+roomGeo.setAttribute('position', new THREE.BufferAttribute(rPos,3).setUsage(THREE.DynamicDrawUsage));
+roomGeo.setAttribute('color', new THREE.BufferAttribute(rCol,4).setUsage(THREE.DynamicDrawUsage));
+roomGeo.setDrawRange(0, 0);
+const roomFill = new THREE.Mesh(roomGeo, new THREE.MeshBasicMaterial({ vertexColors:true, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }));
+roomFill.frustumCulled = false; roomFill.renderOrder = 3; sceneO.add(roomFill);
+const roomEdges = new THREE.InstancedMesh(cyl, new THREE.MeshBasicMaterial({ color:0xffffff }), ROOM_E);
+roomEdges.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+roomEdges.setColorAt(0, new THREE.Color()); roomEdges.frustumCulled = false; roomEdges.count = 0; sceneO.add(roomEdges);
+
+const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(1,32,20), new THREE.MeshBasicMaterial({ color:new THREE.Color(1.0,0.95,0.86) }));
+sceneO.add(ballMesh);
+function glowTex(){ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+  const r=g.createRadialGradient(64,64,0,64,64,64); r.addColorStop(0,'rgba(255,240,215,1)'); r.addColorStop(.25,'rgba(255,220,170,.35)'); r.addColorStop(1,'rgba(255,200,150,0)');
+  g.fillStyle=r; g.fillRect(0,0,128,128); return new THREE.CanvasTexture(c); }
+const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex(), blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.5 }));
+sceneO.add(glow);
+const gaze = new THREE.Mesh(cyl, new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.75 }));
+const gazeTip = new THREE.Mesh(new THREE.ConeGeometry(1,1,14), new THREE.MeshBasicMaterial({ color:0xffffff }));
+sceneO.add(gaze, gazeTip);
+
+const trGeo = new THREE.BufferGeometry();
+const trPos = new Float32Array(TRAIL_N*3), trCol = new Float32Array(TRAIL_N*3);
+trGeo.setAttribute('position', new THREE.BufferAttribute(trPos,3).setUsage(THREE.DynamicDrawUsage));
+trGeo.setAttribute('color', new THREE.BufferAttribute(trCol,3).setUsage(THREE.DynamicDrawUsage));
+const trail = new THREE.Line(trGeo, new THREE.LineBasicMaterial({ vertexColors:true, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+trail.frustumCulled = false; sceneO.add(trail);
+const STAR_N = 1400, STARS4 = [];
+for (let i=0;i<STAR_N;i++){ let v; do { v = [0,1,2,3].map(() => Math.random()*2-1); } while (len(v) > 1 || len(v) < 0.2); STARS4.push(nrm(v)); }
+const starPos = new Float32Array(STAR_N*3), starCol = new Float32Array(STAR_N*3), starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3).setUsage(THREE.DynamicDrawUsage));
+starGeo.setAttribute('color', new THREE.BufferAttribute(starCol,3).setUsage(THREE.DynamicDrawUsage));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ size:0.18, vertexColors:true, transparent:true, opacity:.8 }));
+stars.frustumCulled = false; sceneO.add(stars);
+function updateStars(){
+  const [Rv,Uv,Fv,Av] = linkViews ? [view.R,view.U,view.F,view.A] : [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]];
+  for (let i=0;i<STAR_N;i++){
+    const st = STARS4[i], x = dot(st,Rv), y = dot(st,Uv), z = -dot(st,Fv), w = dot(st,Av), l = Math.hypot(x,y,z) || 1, r = 40 + (i%11)*5;
+    starPos[i*3] = x/l*r; starPos[i*3+1] = y/l*r; starPos[i*3+2] = z/l*r;
+    const br = Math.max(0, Math.sqrt(Math.max(0, 1 - w*w)) - 0.1);
+    starCol[i*3] = 0.44*br; starCol[i*3+1] = 0.47*br; starCol[i*3+2] = 0.63*br;
+  }
+  starGeo.attributes.position.needsUpdate = true; starGeo.attributes.color.needsUpdate = true;
+}
+const eyeMesh = new THREE.Mesh(new THREE.OctahedronGeometry(1), new THREE.MeshBasicMaterial({ color:0xffffff }));
+eyeMesh.visible = false; sceneO.add(eyeMesh);
+
+// chairs: real 3D objects sitting inside each cell, carried through the 4D turn with it
+const chairMat = new THREE.MeshBasicMaterial({ vertexColors:true, side:THREE.DoubleSide });
+let chairMesh = null, chairGeo = null, chairPos = null, chairCol = null, chairLocal = [];
+const BOX_TRI = [[0,4,6],[0,6,2],[1,3,7],[1,7,5],[0,1,5],[0,5,4],[2,6,7],[2,7,3],[0,2,3],[0,3,1],[4,5,7],[4,7,6]];
+const LIGHT3 = (() => { const v = [0.35, 0.8, 0.5], l = Math.hypot(...v); return v.map(x => x/l); })();
+function buildChairs(){
+  chairLocal = [];
+  for (const c of poly.cells){
+    const C = c.N.map(x => x*B); // the cell's centre
+    for (const b of CHAIR){
+      const corners = [];
+      for (let k=0;k<8;k++){
+        const x = b.c[0] + (k&1 ? 1 : -1)*b.h[0], y = b.c[1] + (k&2 ? 1 : -1)*b.h[1], z = b.c[2] + (k&4 ? 1 : -1)*b.h[2];
+        corners.push([0,1,2,3].map(i => C[i] + c.CR[i]*x + c.CU[i]*y + c.CF[i]*z));
+      }
+      for (const tri of BOX_TRI) for (const k of tri) chairLocal.push(corners[k]);
+    }
+  }
+  if (chairMesh){ sceneO.remove(chairMesh); chairGeo.dispose(); }
+  chairGeo = new THREE.BufferGeometry(); chairPos = new Float32Array(chairLocal.length*3); chairCol = new Float32Array(chairLocal.length*3);
+  chairGeo.setAttribute('position', new THREE.BufferAttribute(chairPos,3).setUsage(THREE.DynamicDrawUsage));
+  chairGeo.setAttribute('color', new THREE.BufferAttribute(chairCol,3).setUsage(THREE.DynamicDrawUsage));
+  chairMesh = new THREE.Mesh(chairGeo, chairMat); chairMesh.frustumCulled = false; chairMesh.visible = false; sceneO.add(chairMesh);
+}
+function updateChairs(){
+  chairMesh.visible = layers.chairs;
+  if (!layers.chairs) return;
+  const perCell = CHAIR.length*12, shades = poly.cells.map((c, id) => layers.cone ? NEUTRAL : chairShade(CELL_RGB[id]));
+  for (let i=0;i<chairLocal.length;i+=3){
+    const base = shades[Math.floor(i/3/perCell)];
+    const P0 = proj4(ap(T.R, chairLocal[i])), P1 = proj4(ap(T.R, chairLocal[i+1])), P2 = proj4(ap(T.R, chairLocal[i+2]));
+    const ux = P1[0]-P0[0], uy = P1[1]-P0[1], uz = P1[2]-P0[2], vx = P2[0]-P0[0], vy = P2[1]-P0[1], vz = P2[2]-P0[2];
+    const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx, nl = Math.hypot(nx, ny, nz) || 1;
+    const sh = 0.35 + 0.65*Math.abs((nx*LIGHT3[0] + ny*LIGHT3[1] + nz*LIGHT3[2])/nl); // flat shading, lit from above
+    [P0, P1, P2].forEach((P, k) => { const o = (i+k)*3;
+      chairPos[o]=P[0]; chairPos[o+1]=P[1]; chairPos[o+2]=P[2];
+      chairCol[o]=base[0]*sh; chairCol[o+1]=base[1]*sh; chairCol[o+2]=base[2]*sh; });
+  }
+  chairGeo.attributes.position.needsUpdate = true; chairGeo.attributes.color.needsUpdate = true;
+}
+
+// view cone: the eyes' own field of view, cast onto the walls of the outside view
+const CONE_NX = 28, CONE_NY = 20, CONE_NV = CONE_NX*CONE_NY;
+const conePerim = [];
+for (let i=0;i<CONE_NX;i++) conePerim.push(i);
+for (let j=1;j<CONE_NY;j++) conePerim.push(j*CONE_NX + CONE_NX-1);
+for (let i=CONE_NX-2;i>=0;i--) conePerim.push((CONE_NY-1)*CONE_NX + i);
+for (let j=CONE_NY-2;j>=1;j--) conePerim.push(j*CONE_NX);
+const PERIM_N = conePerim.length;
+const cpPos = new Float32Array(CONE_NV*3), cpCol = new Float32Array(CONE_NV*4), cpIdx = [];
+for (let j=0;j<CONE_NY-1;j++) for (let i=0;i<CONE_NX-1;i++){ const a = j*CONE_NX+i, b = a+1, c = a+CONE_NX, d = c+1; cpIdx.push(a,b,d, a,d,c); }
+const coneGeo = new THREE.BufferGeometry();
+coneGeo.setAttribute('position', new THREE.BufferAttribute(cpPos,3).setUsage(THREE.DynamicDrawUsage));
+coneGeo.setAttribute('color', new THREE.BufferAttribute(cpCol,4).setUsage(THREE.DynamicDrawUsage));
+coneGeo.setIndex(cpIdx);
+const coneFoot = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({ vertexColors:true, transparent:true, depthWrite:false, side:THREE.DoubleSide }));
+coneFoot.frustumCulled = false; coneFoot.renderOrder = 4; coneFoot.visible = false; sceneO.add(coneFoot);
+const coneLines = new THREE.InstancedMesh(cyl, new THREE.MeshBasicMaterial({ color:0xb9bfcf }), PERIM_N + 4);
+coneLines.instanceMatrix.setUsage(THREE.DynamicDrawUsage); coneLines.frustumCulled = false; coneLines.visible = false; sceneO.add(coneLines);
+function updateCone(){
+  coneFoot.visible = coneLines.visible = layers.cone;
+  if (!layers.cone) return;
+  const E = eye(), q0 = apT(T.R, E), ep = proj4(E), asp = paneI.w/paneI.h, hits = new Array(CONE_NV);
+  for (let j=0;j<CONE_NY;j++) for (let i=0;i<CONE_NX;i++){
+    // the same rays the eyes' view is made of: screen point (u, v) at focal length FOCAL
+    const u = (i/(CONE_NX-1) - 0.5)*asp, v = j/(CONE_NY-1) - 0.5, idx = j*CONE_NX + i;
+    const d = nrm([0,1,2,3].map(k => view.R[k]*u + view.U[k]*v + view.F[k]*FOCAL)), dl = apT(T.R, d);
+    let tm = 1e9, id = 0;
+    for (let c=0;c<poly.cells.length;c++){ const N = poly.cells[c].N, den = dot(N, dl); if (den > 1e-6){ const t = (B - dot(N, q0))/den; if (t < tm){ tm = t; id = c; } } }
+    if (tm > 50) tm = 0;
+    const hitW = addS(E, d, tm), P = proj4(hitW);
+    let col = CELL_RGB[id];
+    if (layers.chairs){ const ql = apT(T.R, hitW), cl = poly.cells[id], rel = [0,1,2,3].map(k => ql[k] - cl.N[k]*B);
+      if (chairInside([dot(rel, cl.CR), dot(rel, cl.CU), dot(rel, cl.CF)])) col = chairShade(CELL_RGB[id]); }
+    hits[idx] = P;
+    cpPos[idx*3]=P[0]; cpPos[idx*3+1]=P[1]; cpPos[idx*3+2]=P[2];
+    cpCol[idx*4]=col[0]; cpCol[idx*4+1]=col[1]; cpCol[idx*4+2]=col[2]; cpCol[idx*4+3]=0.42 + flash[id]*0.25;
+  }
+  coneGeo.attributes.position.needsUpdate = true; coneGeo.attributes.color.needsUpdate = true;
+  for (let k=0;k<PERIM_N;k++){
+    const A = hits[conePerim[k]], Bp = hits[conePerim[(k+1)%PERIM_N]];
+    setCyl(coneLines, k, A, Bp, 0.0045*(A[3]+Bp[3])/2);
+  }
+  [0, CONE_NX-1, CONE_NV-1, CONE_NV-CONE_NX].forEach((ci, k) => setCyl(coneLines, PERIM_N + k, ep, hits[ci], 0.0035*(ep[3]+hits[ci][3])/2));
+  coneLines.instanceMatrix.needsUpdate = true;
+}
+
+const _up=new THREE.Vector3(0,1,0), _d=new THREE.Vector3(), _q=new THREE.Quaternion(), _m=new THREE.Matrix4(), _p=new THREE.Vector3(), _s=new THREE.Vector3(), _c=new THREE.Color();
+function setCyl(mesh, idx, a, b, r){
+  _d.set(b[0]-a[0], b[1]-a[1], b[2]-a[2]); const L=_d.length();
+  if (L < 1e-6){ _p.set(a[0],a[1],a[2]); _q.identity(); _s.set(0,0,0); }
+  else { _d.divideScalar(L); _q.setFromUnitVectors(_up,_d); _p.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2); _s.set(r,L,r); }
+  if (idx === null){ mesh.position.copy(_p); mesh.quaternion.copy(_q); mesh.scale.copy(_s); }
+  else { _m.compose(_p,_q,_s); mesh.setMatrixAt(idx,_m); }
+}
+
+function planeBasis(a, b){ // two unit vectors orthogonal to a and b
+  const b2 = nrm(addS(b, a, -dot(b,a))), out = [];
+  for (const e of [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]){
+    let v = addS(e, a, -dot(e,a)); v = addS(v, b2, -dot(v,b2));
+    for (const u of out) v = addS(v, u, -dot(v,u));
+    if (len(v) > 0.2){ out.push(nrm(v)); if (out.length === 2) break; }
+  }
+  return out;
+}
+function computeRoom(Vw){ // slice the shape with the hyperplane the ball sees: one polygon per wall
+  const A = view.A, P = eye();
+  const s = Vw.map(v => dot(sub(v,P), A));
+  const lists = poly.cells.map(() => []);
+  for (const e of poly.E){
+    const sa = s[e.a], sb = s[e.b];
+    if ((sa > 0) === (sb > 0)) continue;
+    const t = sa/(sa - sb), va = Vw[e.a], vb = Vw[e.b];
+    const pt = [va[0]+(vb[0]-va[0])*t, va[1]+(vb[1]-va[1])*t, va[2]+(vb[2]-va[2])*t, va[3]+(vb[3]-va[3])*t];
+    for (const c of e.cells) lists[c].push(pt);
+  }
+  const polys = [];
+  lists.forEach((pts, id) => {
+    const u = []; for (const p of pts) if (!u.some(o => len(sub(p,o)) < 1e-5)) u.push(p);
+    if (u.length < 3) return;
+    const c = [0,0,0,0]; for (const p of u) for (let i=0;i<4;i++) c[i] += p[i]/u.length;
+    const bs = planeBasis(A, ap(T.R, poly.cells[id].N)); if (bs.length < 2) return;
+    const ang = p => { const d = sub(p,c); return Math.atan2(dot(d,bs[1]), dot(d,bs[0])); };
+    u.sort((p1,p2) => ang(p1) - ang(p2));
+    polys.push({ id, pts:u });
+  });
+  return polys;
+}
+
+function updateOutside(dt, t, Vw){
+  const Pw = Vw.map(proj4), nc = poly.cells.length;
+  const baseA = (layers.room ? 0.045 : 0.055)*Math.sqrt(8/nc);
+  const mono = layers.cone; // with the view cone on, colour appears only where the eyes' view lands
+  for (let k=0;k<TRIS.length;k++){
+    const vi = TRIS[k][0], id = TRIS[k][1], p = Pw[vi], c = mono ? NEUTRAL : CELL_RGB[id];
+    fPos[k*3]=p[0]; fPos[k*3+1]=p[1]; fPos[k*3+2]=p[2];
+    fCol[k*4]=c[0]; fCol[k*4+1]=c[1]; fCol[k*4+2]=c[2];
+    fCol[k*4+3] = mono ? baseA*0.6 : baseA + flash[id]*0.21 + (id===gazeCell ? 0.05 + 0.03*Math.sin(t*5) : 0);
+  }
+  faceGeo.attributes.position.needsUpdate = true; faceGeo.attributes.color.needsUpdate = true;
+  const wn = w => clamp((w + 1.4)/2.8, 0, 1);
+  poly.E.forEach((e,i) => {
+    const A = Pw[e.a], Bp = Pw[e.b], k = (A[3]+Bp[3])/2;
+    setCyl(edgeMesh, i, A, Bp, (layers.room ? 0.008 : 0.013)*k);
+    const w = wn((wOf(A)+wOf(Bp))/2);
+    if (layers.room){ const g = 0.04 + 0.035*w; _c.setRGB(g, g*1.03, g*1.12); } // dark grey: the room's borders lead
+    else { const br = 0.35 + 0.65*w; _c.setRGB(0.9*br, 0.92*br, br); }
+    edgeMesh.setColorAt(i,_c);
+  });
+  edgeMesh.instanceMatrix.needsUpdate = true; edgeMesh.instanceColor.needsUpdate = true;
+  Pw.forEach((p,i) => { const r=(layers.room ? 0.017 : 0.028)*p[3]; _p.set(p[0],p[1],p[2]); _s.set(r,r,r); _m.compose(_p,_q.identity(),_s); vertMesh.setMatrixAt(i,_m);
+    const w = wn(wOf(p));
+    if (layers.room){ const g = 0.045 + 0.035*w; _c.setRGB(g, g*1.03, g*1.12); } else { const br = 0.4 + 0.6*w; _c.setRGB(br,br,br); }
+    vertMesh.setColorAt(i,_c); });
+  vertMesh.instanceMatrix.needsUpdate = true; vertMesh.instanceColor.needsUpdate = true;
+
+  roomFill.visible = roomEdges.visible = layers.room;
+  if (layers.room){
+    let nv = 0, ne = 0;
+    for (const { id, pts } of computeRoom(Vw)){
+      const pp = pts.map(proj4), c = mono ? NEUTRAL : CELL_RGB[id], a = mono ? 0.08 : 0.14 + flash[id]*0.15;
+      for (let i=1;i<pp.length-1;i++){
+        for (const P of [pp[0], pp[i], pp[i+1]]){
+          if (nv >= ROOM_V) break;
+          rPos[nv*3]=P[0]; rPos[nv*3+1]=P[1]; rPos[nv*3+2]=P[2];
+          rCol[nv*4]=c[0]; rCol[nv*4+1]=c[1]; rCol[nv*4+2]=c[2]; rCol[nv*4+3]=a; nv++;
+        }
+      }
+      for (let i=0;i<pp.length && ne<ROOM_E;i++){
+        const A = pp[i], Bp = pp[(i+1)%pp.length];
+        setCyl(roomEdges, ne, A, Bp, 0.0095*(A[3]+Bp[3])/2); _c.setRGB(1,1,1); roomEdges.setColorAt(ne,_c); ne++;
+      }
+    }
+    roomGeo.setDrawRange(0, nv); roomGeo.attributes.position.needsUpdate = true; roomGeo.attributes.color.needsUpdate = true;
+    roomEdges.count = ne; roomEdges.instanceMatrix.needsUpdate = true; if (roomEdges.instanceColor) roomEdges.instanceColor.needsUpdate = true;
+  }
+
+  // ball: a 3-sphere's shadow is a sphere
+  const bp = proj4(ball.p);
+  ballMesh.position.set(bp[0],bp[1],bp[2]); ballMesh.scale.setScalar(RB*1.25*bp[3]);
+  glow.position.copy(ballMesh.position); glow.scale.setScalar(RB*1.25*bp[3]*7);
+  // where the eyes are, and where they point
+  const ep = proj4(eye());
+  eyeMesh.visible = view.mode === 'fly';
+  if (eyeMesh.visible){ eyeMesh.position.set(ep[0],ep[1],ep[2]); eyeMesh.scale.setScalar(0.045*ep[3]); }
+  const tip = proj4(addS(eye(), view.F, 0.5)), mid = proj4(addS(eye(), view.F, 0.42));
+  setCyl(gaze, null, ep, mid, 0.012);
+  setCyl(gazeTip, null, mid, tip, 0.035);
+  updateCone();
+  updateChairs();
+  // trail in world coordinates: the ball flies straight, the walls turn
+  const n = ball.trail.length;
+  if (n){
+    for (let i=0;i<TRAIL_N;i++){
+      const src = ball.trail[Math.min(i, n-1)], p = proj4(src), f = Math.min(i, n-1)/TRAIL_N;
+      trPos[i*3]=p[0]; trPos[i*3+1]=p[1]; trPos[i*3+2]=p[2];
+      trCol[i*3]=1.0*f; trCol[i*3+1]=0.2*f; trCol[i*3+2]=0.18*f;
+    }
+    trGeo.attributes.position.needsUpdate = true; trGeo.attributes.color.needsUpdate = true;
+  }
+  if (linkViews) camO.position.set(0, 0, orbit.dist); // behind the centre, facing where the eyes face
+  else {
+    if (t - orbit.lastInput > 4) orbit.th += dt*0.05;
+    camO.position.set(orbit.dist*Math.cos(orbit.ph)*Math.sin(orbit.th), orbit.dist*Math.sin(orbit.ph), orbit.dist*Math.cos(orbit.ph)*Math.cos(orbit.th));
+  }
+  camO.lookAt(0,0,0);
+  updateStars();
+}
+
+/* ---------- inside: the ball's eyes (analytic rays against every wall) ---------- */
+const FRAG = /* glsl */`
+precision highp float;
+#define MAXC 12
+uniform vec4 uRect;
+uniform vec4 uP, uR, uU, uF, uA;
+uniform mat4 uRt;
+uniform float uB, uTime, uFocal, uGhost;
+uniform int uCount;
+uniform vec4 uN[MAXC];
+uniform vec4 uT[MAXC];
+uniform float uPl[MAXC];
+uniform vec3 uCol[MAXC];
+uniform float uFlash[MAXC];
+uniform float uFlashAll;
+uniform vec3 uFlashCol;
+uniform vec4 uBall;
+uniform float uBallR;
+uniform vec4 uCR[MAXC];
+uniform vec4 uCU[MAXC];
+uniform vec4 uCF[MAXC];
+uniform float uChair;
+${CHAIR_GLSL}
+
+const vec3 ANA  = vec3(0.32,0.66,1.0);
+const vec3 KATA = vec3(1.0,0.32,0.44);
+
+float hash41(vec4 p4){ p4 = fract(p4*vec4(.1031,.1030,.0973,.1099)); p4 += dot(p4,p4.wzxy+33.33); return fract((p4.x+p4.y)*(p4.z+p4.w)); }
+
+/* a sky fixed to the world, not to the shape: blue toward +w, red toward -w */
+vec3 sky(vec4 d){
+  vec3 c = vec3(0.010,0.012,0.028);
+  c += vec3(0.30,0.60,1.00)*pow(max(d.w,0.),3.0)*0.20;
+  c += vec3(1.00,0.30,0.42)*pow(max(-d.w,0.),3.0)*0.20;
+  c += vec3(0.95,0.85,0.65)*pow(max(d.y,0.),5.0)*0.06;
+  vec4 s = d*70.0; float h = hash41(floor(s));
+  c += step(0.9915,h)*smoothstep(0.45,0.08,length(fract(s)-0.5))*mix(vec3(.7,.8,1.),vec3(1.,.85,.7),fract(h*77.))*1.3;
+  return c;
+}
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.,1.); }
+
+void castRay(vec4 q0, vec4 dl, out float tmin, out int id){
+  tmin = 1e9; id = 0;
+  for (int i=0;i<MAXC;i++){
+    if (i >= uCount) break;
+    float den = dot(uN[i], dl);
+    if (den > 1e-6){
+      float t = (uB - dot(uN[i], q0))/den;
+      if (t < tmin){ tmin = t; id = i; }
+    }
+  }
+}
+/* distance from a point on wall id to the edge of that wall */
+float edgeDist(vec4 h, int id){
+  vec4 Ni = uN[id]; float e = 1e9;
+  for (int j=0;j<MAXC;j++){
+    if (j >= uCount) break;
+    if (j == id) continue;
+    float c = dot(uN[j], Ni);
+    if (abs(c) > 0.999) continue;
+    e = min(e, (uB - dot(uN[j], h))/sqrt(1.0 - c*c));
+  }
+  return e;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - uRect.xy - 0.5*uRect.zw)/uRect.w;
+  vec4 d = normalize(uR*uv.x + uU*uv.y + uF*uFocal);
+  vec4 q0 = uRt*uP, dl = uRt*d;
+  float t; int id;
+  castRay(q0, dl, t, id);
+  vec4 h = q0 + dl*t;
+  vec3 cc = uCol[id];
+  vec4 Tt = uT[id];
+  float inc = max(dot(uN[id], dl), 1e-3);
+  vec3 o = uPl[id] < 0.5 ? vec3(dot(h,Tt), h.y, h.z) : vec3(h.x, h.w, dot(h,Tt));
+
+  vec3 fw = fwidth(o);
+  vec3 g = abs(fract(o*4.0 + 0.5) - 0.5)/4.0;
+  vec3 gl = 1.0 - smoothstep(vec3(0.), fw*1.1 + 0.0015, g);
+  float grid = max(max(gl.x,gl.y),gl.z);
+  float e = edgeDist(h, id);
+  float pix = t/(uFocal*uRect.w)/inc;
+  float edge = 1.0 - smoothstep(0., pix*1.6 + 0.004, e);
+  float att = 1.0/(1.0 + t*t*0.12);
+
+  vec3 col = sky(d)*mix(vec3(1.), cc, 0.5);
+  col += cc*(0.035 + 0.11*sqrt(inc))*att;
+  col += cc*grid*0.28*att;
+  col += mix(cc, vec3(1.), 0.55)*(edge*0.95 + exp(-e*16.0)*0.35)*att;
+  col += cc*uFlash[id]*0.15;
+
+  /* chairs: each wall is a slice of a cell, so the eyes see a slice of the chair sitting in it */
+  if (uChair > 0.5){
+    vec4 rel = h - uN[id]*uB;
+    vec3 cp = vec3(dot(rel, uCR[id]), dot(rel, uCU[id]), dot(rel, uCF[id]));
+    float dc = chairSDF(cp);
+    float lw = pix*1.3 + 0.002;
+    if (dc < 0.0) col = mix(col, mix(cc, vec3(1.0), 0.1)*(0.45 + 0.55*att)*(0.7 + 0.3*smoothstep(-0.05, 0.0, dc)), 0.9);
+    col = mix(col, vec3(0.05,0.035,0.02), (1.0 - smoothstep(0.0, lw, abs(dc)))*0.85);
+  }
+
+  /* free fly: the ball is out there, and shows only where it crosses your slice */
+  if (uBallR > 0.0){
+    vec4 oc = uP - uBall;
+    float bq = dot(oc, d), cq = dot(oc, oc) - uBallR*uBallR, disc = bq*bq - cq;
+    if (disc > 0.0){
+      float tb = -bq - sqrt(disc);
+      if (tb > 0.0 && tb < t){
+        vec4 nb = (uP + d*tb - uBall)/uBallR;
+        float nab = dot(nb, uA);
+        float lam = 0.3 + 0.7*max(dot(nb, normalize(uU*0.7 - uF*0.4 + uR*0.35)), 0.0);
+        col = vec3(1.0,0.95,0.86)*lam/(1.0 + tb*tb*0.12) + (nab > 0.0 ? ANA : KATA)*pow(abs(nab), 1.5)*0.8;
+      }
+    }
+  }
+
+  /* ana/kata sight: rays tilted slightly out of the slice, drawn as blue and red ghosts */
+  if (uGhost > 0.001){
+    for (int k=0;k<4;k++){
+      float beta = k==0 ? 0.3 : k==1 ? -0.3 : k==2 ? 0.7 : -0.7;
+      vec4 dg = normalize(d + uA*beta);
+      vec4 dlg = uRt*dg;
+      float tg; int ig;
+      castRay(q0, dlg, tg, ig);
+      vec4 hg = q0 + dlg*tg;
+      float incg = max(dot(uN[ig], dlg), 1e-3);
+      float eg = edgeDist(hg, ig);
+      float pw = tg/(uFocal*uRect.w)/incg;
+      float edg = 1.0 - smoothstep(0., pw*2.0 + 0.008, eg);
+      vec3 tint = mix(uCol[ig], beta > 0.0 ? ANA : KATA, 0.5);
+      float wgt = (abs(beta) < 0.5 ? 0.6 : 0.32)*uGhost;
+      float attg = 1.0/(1.0 + tg*tg*0.3);
+      col += tint*(edg*0.75 + 0.045)*attg*wgt;
+    }
+  }
+
+  col += uFlashCol*uFlashAll*0.08;
+  col *= 1.0 - 0.45*dot(uv,uv);
+  col = pow(aces(col*1.1), vec3(0.4545));
+  gl_FragColor = vec4(col, 1.0);
+}`;
+const uI = {
+  uRect:{value:new THREE.Vector4()}, uP:{value:new THREE.Vector4()}, uR:{value:new THREE.Vector4()}, uU:{value:new THREE.Vector4()},
+  uF:{value:new THREE.Vector4()}, uA:{value:new THREE.Vector4()}, uRt:{value:new THREE.Matrix4()},
+  uB:{value:B}, uTime:{value:0}, uFocal:{value:FOCAL}, uGhost:{value:0}, uCount:{value:8},
+  uN:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},
+  uT:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},
+  uPl:{value:new Array(MAXC).fill(0)},
+  uCol:{value:Array.from({length:MAXC},()=>new THREE.Vector3())},
+  uFlash:{value:new Array(MAXC).fill(0)},
+  uFlashAll:{value:0}, uFlashCol:{value:new THREE.Vector3(1,1,1)},
+  uBall:{value:new THREE.Vector4()}, uBallR:{value:0},
+  uCR:{value:Array.from({length:MAXC},()=>new THREE.Vector4())}, uCU:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},
+  uCF:{value:Array.from({length:MAXC},()=>new THREE.Vector4())}, uChair:{value:0},
+};
+const sceneI = new THREE.Scene(), camI = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+const quad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), new THREE.ShaderMaterial({ uniforms:uI, fragmentShader:FRAG, toneMapped:false, depthTest:false, depthWrite:false,
+  vertexShader:`void main(){ gl_Position = vec4(position.xy,0.,1.); }` }));
+quad.frustumCulled = false; sceneI.add(quad);
+
+function buildShape(key){
+  SH = SHAPES[key]; poly = makeDuoprism(SH.p, SH.q);
+  CELL_RGB = SH.hex.map(h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16)/255));
+  TRIS = [];
+  poly.cells.forEach((c,id) => c.faces.forEach(f => { for (let k=1;k<f.length-1;k++) TRIS.push([f[0],id],[f[k],id],[f[k+1],id]); }));
+  if (faces){ sceneO.remove(faces); faceGeo.dispose(); }
+  faceGeo = new THREE.BufferGeometry(); fPos = new Float32Array(TRIS.length*3); fCol = new Float32Array(TRIS.length*4);
+  faceGeo.setAttribute('position', new THREE.BufferAttribute(fPos,3).setUsage(THREE.DynamicDrawUsage));
+  faceGeo.setAttribute('color', new THREE.BufferAttribute(fCol,4).setUsage(THREE.DynamicDrawUsage));
+  faces = new THREE.Mesh(faceGeo, faceMat); faces.frustumCulled = false; faces.renderOrder = 2; sceneO.add(faces);
+  if (edgeMesh){ sceneO.remove(edgeMesh); edgeMesh.dispose(); }
+  edgeMesh = new THREE.InstancedMesh(cyl, edgeMat, poly.E.length); edgeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  edgeMesh.setColorAt(0, new THREE.Color()); edgeMesh.frustumCulled = false; sceneO.add(edgeMesh);
+  if (vertMesh){ sceneO.remove(vertMesh); vertMesh.dispose(); }
+  vertMesh = new THREE.InstancedMesh(sph, edgeMat, poly.V.length); vertMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  vertMesh.setColorAt(0, new THREE.Color()); vertMesh.frustumCulled = false; sceneO.add(vertMesh);
+  for (let i=0;i<MAXC;i++){
+    const c = poly.cells[i];
+    if (c){ uI.uN.value[i].set(...c.N); uI.uT.value[i].set(...c.T); uI.uPl.value[i] = c.pl; uI.uCol.value[i].set(...CELL_RGB[i]);
+      uI.uCR.value[i].set(...c.CR); uI.uCU.value[i].set(...c.CU); uI.uCF.value[i].set(...c.CF); }
+    else { uI.uN.value[i].set(0,0,0,0); uI.uT.value[i].set(0,0,0,0); uI.uPl.value[i] = 0; uI.uCol.value[i].set(0,0,0);
+      uI.uCR.value[i].set(0,0,0,0); uI.uCU.value[i].set(0,0,0,0); uI.uCF.value[i].set(0,0,0,0); }
+  }
+  uI.uCount.value = poly.cells.length;
+  buildChairs();
+  flash.fill(0); lastHit.fill(-1); flashAll = 0;
+  ball.p = [0,0,0,0]; ball.trail = []; ball.hits = 0;
+  kick();
+  document.getElementById('title').textContent = poly.cells.length === 8 ? 'eight walls' : 'twelve walls';
+  document.querySelectorAll('#shapes .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.shape === key)));
+  if (layers.hum) sound.buildHum();
+}
+
+/* ================================================================ layout */
+const stage = document.getElementById('stage'), hud = document.getElementById('hud'), hx = hud.getContext('2d');
+let W=1, H=1, paneO = {x:0,y:0,w:1,h:1}, paneI = {x:0,y:0,w:1,h:1}, portrait=false;
+function layout(){
+  W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight); portrait = W < H*0.95;
+  renderer.setSize(W, H, false);
+  hud.width = Math.round(W*DPR); hud.height = Math.round(H*DPR);
+  if (portrait){ paneO = {x:0,y:0,w:W,h:Math.round(H/2)}; paneI = {x:0,y:Math.round(H/2),w:W,h:H-Math.round(H/2)}; }
+  else { paneO = {x:0,y:0,w:Math.round(W/2),h:H}; paneI = {x:Math.round(W/2),y:0,w:W-Math.round(W/2),h:H}; }
+  const dv = document.getElementById('divider');
+  Object.assign(dv.style, portrait ? {left:'0',top:paneI.y+'px',width:'100%',height:'1px'} : {left:paneI.x+'px',top:'0',width:'1px',height:'100%'});
+  Object.assign(document.getElementById('labO').style, {left:(paneO.x+16)+'px', top:(paneO.y+14)+'px'});
+  Object.assign(document.getElementById('labI').style, {left:(paneI.x+16)+'px', top:(paneI.y+14)+'px'});
+  camO.aspect = paneO.w/paneO.h; camO.fov = portrait ? 44 : 40; camO.updateProjectionMatrix();
+}
+new ResizeObserver(layout).observe(stage);
+layout();
+const glRect = p => [p.x, H - p.y - p.h, p.w, p.h]; // bottom-left origin for WebGL
+
+/* ================================================================ HUD */
+const css = c => `rgb(${c[0]*255|0},${c[1]*255|0},${c[2]*255|0})`;
+function convexHull(P){
+  const pts = P.slice().sort((a,b) => a[0]-b[0] || a[1]-b[1]); if (pts.length < 3) return pts;
+  const cr = (o,a,b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+  const lo = []; for (const p of pts){ while (lo.length >= 2 && cr(lo[lo.length-2], lo[lo.length-1], p) <= 1e-12) lo.pop(); lo.push(p); }
+  const up = []; for (let i=pts.length-1;i>=0;i--){ const p = pts[i]; while (up.length >= 2 && cr(up[up.length-2], up[up.length-1], p) <= 1e-12) up.pop(); up.push(p); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+function shadowPlanes(){ // which two world planes to cast flat shadows on
+  const ps = [...T.planes], moving = ps.length && T.w > 0;
+  if (moving && ps.length === 1){ const pl = ps[0], comp = [0,1,2,3].filter(k => !pl.includes(String(k)));
+    return [[+pl[0], +pl[1], 'spinning'], [comp[0], comp[1], 'still']]; }
+  if (moving && ps.length === 2 && new Set((ps[0]+ps[1]).split('')).size === 4)
+    return [[+ps[0][0], +ps[0][1], 'spinning'], [+ps[1][0], +ps[1][1], 'spinning']];
+  const lab = key => !moving ? 'still' : ps.includes(key) ? 'spinning' : 'moving';
+  return [[0,3,lab('03')], [1,2,lab('12')]];
+}
+function drawShadow(x0, y0, S, a, b, state, Vw){
+  const s = DPR, X = x0*s, Y = y0*s, Wd = S*s, cx = X + Wd/2, cy = Y + Wd/2 + 6*s, sc = (Wd/2 - 16*s)/poly.vmax;
+  hx.fillStyle = 'rgba(6,8,17,.8)'; hx.fillRect(X, Y, Wd, Wd);
+  hx.strokeStyle = 'rgba(231,234,243,.16)'; hx.lineWidth = 1*s; hx.strokeRect(X+.5*s, Y+.5*s, Wd-s, Wd-s);
+  const hull = convexHull(Vw.map(v => [v[a], v[b]]));
+  hx.beginPath(); hull.forEach((p,i) => { const px = cx + p[0]*sc, py = cy - p[1]*sc; if (i) hx.lineTo(px,py); else hx.moveTo(px,py); }); hx.closePath();
+  hx.fillStyle = 'rgba(231,234,243,.05)'; hx.fill(); hx.strokeStyle = 'rgba(231,234,243,.3)'; hx.lineWidth = 1*s; hx.stroke();
+  // walls that lie flat in this plane show up as coloured edges
+  hx.lineCap = 'round';
+  poly.cells.forEach((c, id) => {
+    const n = ap(T.R, c.N), ip = n[a]*n[a] + n[b]*n[b];
+    if (ip < 0.995) return;
+    const l = Math.sqrt(ip), na = n[a]/l, nb = n[b]/l, da = -nb, db = na;
+    let lo = 1e9, hi = -1e9;
+    for (const vi of c.verts){ const u = Vw[vi][a]*da + Vw[vi][b]*db; if (u < lo) lo = u; if (u > hi) hi = u; }
+    hx.strokeStyle = css(CELL_RGB[id]); hx.lineWidth = (2.2 + flash[id]*1.75)*s;
+    hx.beginPath(); hx.moveTo(cx + (na*B + da*lo)*sc, cy - (nb*B + db*lo)*sc); hx.lineTo(cx + (na*B + da*hi)*sc, cy - (nb*B + db*hi)*sc); hx.stroke();
+  });
+  hx.lineCap = 'butt';
+  // the ball's path in this plane
+  const tr = ball.trail, n = tr.length;
+  if (n > 1){ const G = 10; hx.lineWidth = 1.2*s;
+    for (let g=0; g<G; g++){ const i0 = Math.floor(g*(n-1)/G), i1 = Math.floor((g+1)*(n-1)/G); if (i1 <= i0) continue;
+      hx.beginPath(); for (let i=i0;i<=i1;i++){ const px = cx + tr[i][a]*sc, py = cy - tr[i][b]*sc; if (i === i0) hx.moveTo(px,py); else hx.lineTo(px,py); }
+      hx.strokeStyle = `rgba(255,60,55,${(0.1 + 0.6*(g+1)/G).toFixed(3)})`; hx.stroke(); } }
+  const bx = cx + ball.p[a]*sc, by = cy - ball.p[b]*sc, br = RB*sc;
+  const gl = hx.createRadialGradient(bx, by, 0, bx, by, br*3.2); gl.addColorStop(0,'rgba(255,236,205,.275)'); gl.addColorStop(1,'rgba(255,220,170,0)');
+  hx.fillStyle = gl; hx.beginPath(); hx.arc(bx, by, br*3.2, 0, Math.PI*2); hx.fill();
+  hx.fillStyle = '#fff4e2'; hx.beginPath(); hx.arc(bx, by, br, 0, Math.PI*2); hx.fill();
+  if (view.mode === 'fly'){ const ex = cx + flyer.p[a]*sc, ey = cy - flyer.p[b]*sc, r = 4.5*s;
+    hx.fillStyle = '#ffffff'; hx.beginPath(); hx.moveTo(ex, ey - r); hx.lineTo(ex + r, ey); hx.lineTo(ex, ey + r); hx.lineTo(ex - r, ey); hx.closePath(); hx.fill(); }
+  // labels
+  hx.textAlign = 'left'; hx.textBaseline = 'top';
+  hx.font = `${12*s}px "Major Mono Display", ui-monospace, monospace`; hx.fillStyle = '#e7eaf3'; hx.fillText(AX[a]+AX[b], X + 8*s, Y + 7*s);
+  hx.font = `${10.5*s}px Jura, ui-sans-serif, sans-serif`;
+  hx.fillStyle = state === 'spinning' ? '#f2d49b' : state === 'still' ? 'rgba(231,234,243,.6)' : '#c9b8ff';
+  hx.fillText(state, X + 32*s, Y + 8*s);
+  const ax0 = X + 12*s, ay0 = Y + Wd - 12*s;
+  hx.strokeStyle = 'rgba(231,234,243,.35)'; hx.lineWidth = 1*s;
+  hx.beginPath(); hx.moveTo(ax0, ay0); hx.lineTo(ax0 + 16*s, ay0); hx.moveTo(ax0, ay0); hx.lineTo(ax0, ay0 - 16*s); hx.stroke();
+  hx.fillStyle = 'rgba(231,234,243,.55)'; hx.font = `${10*s}px "Major Mono Display", ui-monospace, monospace`;
+  hx.textBaseline = 'middle'; hx.fillText(AX[a], ax0 + 19*s, ay0);
+  hx.textAlign = 'center'; hx.textBaseline = 'bottom'; hx.fillText(AX[b], ax0, ay0 - 18*s);
+}
+function drawShadows(Vw){
+  const s = DPR, P = paneO, S = Math.round(clamp(Math.min(P.w*0.25, P.h*0.3), 92, 190)), y = P.y + P.h - S - 16;
+  hx.save(); hx.beginPath(); hx.rect(P.x*s, P.y*s, P.w*s, P.h*s); hx.clip();
+  shadowPlanes().forEach(([a,b,state], i) => drawShadow(P.x + 16 + i*(S + 10), y, S, a, b, state, Vw));
+  hx.restore();
+}
+function pausedTag(P){ const s = DPR; hx.font = `${12*s}px "Major Mono Display", ui-monospace, monospace`; hx.textAlign = 'right'; hx.textBaseline = 'top';
+  hx.fillStyle = '#f2d49b'; hx.fillText('paused', (P.x + P.w - 16)*s, (P.y + 16)*s); }
+
+function drawBallLocator(L, T0, Wd, Hd, cx, cy, fpx){ // free fly: where the ball is, and how far out of your slice
+  const s = DPR, d = sub(ball.p, flyer.p), dist = len(d);
+  if (dist < 1e-6) return;
+  const r = dot(d, view.R), u = dot(d, view.U), f = dot(d, view.F), off = dot(d, view.A), inSlice = Math.abs(off) < RB, pad = 30*s;
+  let x = 0, y = 0, inside = false;
+  if (f > 0.02){ x = cx + r/f*fpx; y = cy - u/f*fpx; inside = x > L+pad && x < L+Wd-pad && y > T0+pad && y < T0+Hd-pad; }
+  hx.strokeStyle = '#f2d49b'; hx.fillStyle = '#f2d49b'; hx.lineWidth = 1.5*s;
+  if (inside){
+    hx.setLineDash(inSlice ? [] : [3*s, 3*s]); hx.beginPath(); hx.arc(x, y, 13*s, 0, Math.PI*2); hx.stroke(); hx.setLineDash([]);
+  } else {
+    let dx = r, dy = -u; const l = Math.hypot(dx, dy);
+    if (l < 1e-6){ dx = 0; dy = -1; } else { dx /= l; dy /= l; }
+    const hw = Wd/2 - pad, hh = Hd/2 - pad;
+    const k = Math.min(Math.abs(dx) > 1e-6 ? hw/Math.abs(dx) : 1e9, Math.abs(dy) > 1e-6 ? hh/Math.abs(dy) : 1e9);
+    x = cx + dx*k; y = cy + dy*k;
+    hx.beginPath(); hx.moveTo(x + dx*10*s, y + dy*10*s); hx.lineTo(x - dy*6*s - dx*3*s, y + dx*6*s - dy*3*s); hx.lineTo(x + dy*6*s - dx*3*s, y - dx*6*s - dy*3*s); hx.closePath(); hx.fill();
+  }
+  const toRight = x < L + Wd*0.72, lx = x + (toRight ? 18 : -18)*s;
+  hx.textAlign = toRight ? 'left' : 'right'; hx.textBaseline = 'middle'; hx.font = `${11*s}px Jura, ui-sans-serif, sans-serif`;
+  hx.fillStyle = '#f2d49b'; hx.fillText(`ball ${dist.toFixed(2)}`, lx, y - 7*s);
+  hx.fillStyle = inSlice ? 'rgba(231,234,243,.7)' : (off > 0 ? '#52b6ff' : '#ff5470');
+  hx.fillText(inSlice ? 'in your slice' : `${Math.abs(off).toFixed(2)} ${off > 0 ? 'ana' : 'kata'} of your slice`, lx, y + 7*s);
+}
+function drawPrograde(L, T0, Wd, Hd, cx, cy, fpx){
+  const s = DPR, v = nrm(ball.v), vr = dot(v,view.R), vu = dot(v,view.U), vf = dot(v,view.F), va = dot(v,view.A);
+  const inSlice = Math.sqrt(Math.max(0,1-va*va));
+  const mark = (sx, sy, retro) => {
+    const x = cx + sx*fpx, y = cy - sy*fpx;
+    if (x < L || x > L+Wd || y < T0 || y > T0+Hd) return;
+    hx.globalAlpha = 0.25 + 0.75*inSlice; hx.strokeStyle = '#f2d49b'; hx.lineWidth = 1.6*s;
+    hx.beginPath(); hx.arc(x, y, 9*s, 0, Math.PI*2); hx.stroke();
+    if (retro){ hx.beginPath(); hx.moveTo(x-6*s,y-6*s); hx.lineTo(x+6*s,y+6*s); hx.moveTo(x+6*s,y-6*s); hx.lineTo(x-6*s,y+6*s); hx.stroke(); }
+    else { hx.beginPath(); hx.moveTo(x-17*s,y); hx.lineTo(x-9*s,y); hx.moveTo(x+9*s,y); hx.lineTo(x+17*s,y); hx.moveTo(x,y-9*s); hx.lineTo(x,y-15*s); hx.stroke();
+      hx.beginPath(); hx.arc(x,y,1.8*s,0,Math.PI*2); hx.fillStyle='#f2d49b'; hx.fill(); }
+    if (Math.abs(va) > 0.08){
+      hx.font = `${10.5*s}px Jura, ui-sans-serif, sans-serif`; hx.textAlign='left'; hx.textBaseline='middle';
+      hx.fillStyle = va>0 ? '#52b6ff' : '#ff5470';
+      hx.fillText(`${Math.round(Math.abs(va)*100)}% ${va>0?'ana':'kata'}`, x+20*s, y);
+    }
+    hx.globalAlpha = 1;
+  };
+  if (vf > 0.02) mark(vr/vf, vu/vf, false);
+  else if (vf < -0.02) mark(vr/vf, vu/vf, true); // the point exactly behind the ball, where it came from
+}
+function drawWarn(info, L, T0, Wd, Hd, cx, cy){ // a wall lying mostly in ana or kata, about to hit
+  let best = null, amt = 0;
+  for (const w of info){ const a = clamp(1 - w.gap/0.45, 0, 1)*clamp((Math.abs(w.na) - 0.45)/0.45, 0, 1); if (a > amt){ amt = a; best = w; } }
+  if (!best || amt < 0.03) return;
+  const s = DPR, c = CELL_RGB[best.id], rgb = `${c[0]*255|0},${c[1]*255|0},${c[2]*255|0}`;
+  const g = hx.createRadialGradient(cx, cy, Math.min(Wd,Hd)*0.22, cx, cy, Math.max(Wd,Hd)*0.72);
+  g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(1, `rgba(${rgb},${(0.55*amt).toFixed(3)})`);
+  hx.fillStyle = g; hx.fillRect(L, T0, Wd, Hd);
+  hx.globalAlpha = Math.min(1, amt*1.6); hx.font = `${12*s}px Jura, ui-sans-serif, sans-serif`; hx.textAlign = 'center'; hx.textBaseline = 'top';
+  hx.fillStyle = css(c); hx.fillText(`${SH.names[best.id]} wall ${Math.max(0,best.gap).toFixed(2)} away, ${best.na > 0 ? 'in ana' : 'in kata'}`, cx, T0 + 82*s);
+  hx.globalAlpha = 1;
+}
+function drawMarkers(info, L, T0, Wd, Hd, cx, cy, fpx){
+  const s = DPR, pad = 30*s;
+  for (const w of info){
+    if (w.ins < 0.22) continue; // lies almost entirely in the fourth direction: see the strip
+    const col = css(CELL_RGB[w.id]), prox = clamp(1 - w.gap/1.4, 0, 1);
+    let x = 0, y = 0, inside = false;
+    if (w.nf > 0.05){ x = cx + w.nr/w.nf*fpx; y = cy - w.nu/w.nf*fpx; inside = x > L+pad && x < L+Wd-pad && y > T0+pad && y < T0+Hd-pad; }
+    if (!inside && w.gap > 0.55) continue; // out of view and not close: leave it to the bars
+    hx.globalAlpha = 0.35 + 0.65*prox;
+    if (inside){
+      hx.strokeStyle = col; hx.lineWidth = 1.6*s; hx.beginPath(); hx.arc(x, y, 7*s, 0, Math.PI*2); hx.stroke();
+      hx.fillStyle = col; hx.beginPath(); hx.arc(x, y, 1.7*s, 0, Math.PI*2); hx.fill();
+    } else {
+      let dx = w.nr, dy = -w.nu; const l = Math.hypot(dx, dy);
+      if (l < 1e-4){ dx = 0; dy = -1; } else { dx /= l; dy /= l; }
+      const hw = Wd/2 - pad, hh = Hd/2 - pad;
+      const k = Math.min(Math.abs(dx) > 1e-6 ? hw/Math.abs(dx) : 1e9, Math.abs(dy) > 1e-6 ? hh/Math.abs(dy) : 1e9);
+      x = cx + dx*k; y = cy + dy*k;
+      hx.fillStyle = col; hx.beginPath();
+      hx.moveTo(x + dx*9*s, y + dy*9*s); hx.lineTo(x - dy*5*s - dx*3*s, y + dx*5*s - dy*3*s); hx.lineTo(x + dy*5*s - dx*3*s, y - dx*5*s - dy*3*s);
+      hx.closePath(); hx.fill();
+    }
+    const toRight = x < L + Wd*0.72, lx = x + (toRight ? 13 : -13)*s, two = inside && Math.abs(w.na) > 0.25;
+    hx.textAlign = toRight ? 'left' : 'right'; hx.textBaseline = 'middle';
+    hx.font = `${11*s}px Jura, ui-sans-serif, sans-serif`; hx.fillStyle = col;
+    hx.fillText(`${SH.names[w.id]}  ${Math.max(0, w.gap).toFixed(2)}`, lx, y - (two ? 7 : 0)*s);
+    if (two){ hx.fillStyle = w.na > 0 ? '#52b6ff' : '#ff5470'; hx.fillText(`${Math.round(Math.abs(w.na)*100)}% ${w.na > 0 ? 'ana' : 'kata'}`, lx, y + 7*s); }
+  }
+  hx.globalAlpha = 1;
+}
+function drawStrip(info, L, T0, Wd, Hd){ // walls that lie mostly in the fourth direction
+  const s = DPR, x = L + Wd - 30*s, top = T0 + Hd*0.3, bot = T0 + Hd*0.7, mid = (top+bot)/2, half = (bot-top)/2;
+  const g = hx.createLinearGradient(0, top, 0, bot);
+  g.addColorStop(0, 'rgba(82,182,255,.7)'); g.addColorStop(0.5, 'rgba(231,234,243,.15)'); g.addColorStop(1, 'rgba(255,84,112,.7)');
+  hx.fillStyle = g; hx.fillRect(x - 1*s, top, 2*s, bot - top);
+  hx.font = `${10*s}px Jura, ui-sans-serif, sans-serif`; hx.textAlign = 'center';
+  hx.textBaseline = 'bottom'; hx.fillStyle = '#52b6ff'; hx.fillText('ANA', x, top - 5*s);
+  hx.textBaseline = 'top'; hx.fillStyle = '#ff5470'; hx.fillText('KATA', x, bot + 5*s);
+  const items = info.filter(w => Math.abs(w.na) > 0.45).map(w => ({ w, y:mid - w.na*half })).sort((a,b) => a.y - b.y);
+  const labels = Wd > 420*s;
+  let prev = -1e9; for (const it of items){ if (it.w.gap >= 1.0) { it.ly = it.y; continue; } it.ly = Math.max(it.y, prev + 13*s); prev = it.ly; }
+  hx.textAlign = 'right'; hx.textBaseline = 'middle'; hx.font = `${10.5*s}px Jura, ui-sans-serif, sans-serif`;
+  for (const { w, y, ly } of items){
+    const prox = clamp(1 - w.gap/1.4, 0, 1);
+    hx.globalAlpha = 0.4 + 0.6*prox; hx.fillStyle = css(CELL_RGB[w.id]);
+    hx.beginPath(); hx.arc(x, y, (2.5 + 4*prox)*s, 0, Math.PI*2); hx.fill();
+    if (labels && w.gap < 1.0) hx.fillText(`${SH.names[w.id]} ${Math.max(0, w.gap).toFixed(2)}`, x - 12*s, ly);
+  }
+  hx.globalAlpha = 1;
+}
+function drawBars(info, cx, bottom){ // distance to every wall
+  const s = DPR, n = info.length, bw = (n > 8 ? 12 : 16)*s, gp = (n > 8 ? 5 : 6)*s;
+  const total = n*bw + (n-1)*gp, x0 = cx - total/2, yb = bottom - 22*s, bh = 44*s;
+  for (const w of info){
+    const near = clamp(1 - w.d4/(2*B), 0, 1), x = x0 + w.id*(bw+gp);
+    hx.fillStyle = 'rgba(231,234,243,.08)'; hx.fillRect(x, yb-bh, bw, bh);
+    hx.fillStyle = css(CELL_RGB[w.id]); hx.globalAlpha = 0.45 + 0.55*flash[w.id];
+    const hh = Math.max(2*s, bh*near*near); hx.fillRect(x, yb-hh, bw, hh); hx.globalAlpha = 1;
+    hx.font = n > 8 ? `${10*s}px Jura, ui-sans-serif, sans-serif` : `${11*s}px "Major Mono Display", ui-monospace, monospace`;
+    hx.textAlign = 'center'; hx.textBaseline = 'top';
+    hx.fillStyle = w.id === gazeCell ? '#e7eaf3' : 'rgba(231,234,243,.55)'; hx.fillText(SH.names[w.id], x + bw/2, yb + 5*s);
+  }
+}
+function drawInside(info){
+  const s = DPR, P = paneI, L = P.x*s, T0 = P.y*s, Wd = P.w*s, Hd = P.h*s, cx = L + Wd/2, cy = T0 + Hd/2, fpx = Hd*FOCAL;
+  hx.save(); hx.beginPath(); hx.rect(L, T0, Wd, Hd); hx.clip();
+  if (layers.markers) drawWarn(info, L, T0, Wd, Hd, cx, cy);
+  hx.strokeStyle = 'rgba(231,234,243,.45)'; hx.lineWidth = 1*s; hx.beginPath();
+  hx.moveTo(cx-6*s,cy); hx.lineTo(cx-2*s,cy); hx.moveTo(cx+2*s,cy); hx.lineTo(cx+6*s,cy);
+  hx.moveTo(cx,cy-6*s); hx.lineTo(cx,cy-2*s); hx.moveTo(cx,cy+2*s); hx.lineTo(cx,cy+6*s); hx.stroke();
+  if (view.mode === 'fly') drawBallLocator(L, T0, Wd, Hd, cx, cy, fpx); else drawPrograde(L, T0, Wd, Hd, cx, cy, fpx);
+  if (layers.markers){ drawMarkers(info, L, T0, Wd, Hd, cx, cy, fpx); drawStrip(info, L, T0, Wd, Hd); }
+  drawBars(info, cx, T0 + Hd);
+  hx.font = `${11*s}px Jura, ui-sans-serif, sans-serif`; hx.textAlign = 'left'; hx.textBaseline = 'top';
+  const t1 = `${ball.hits} bounces · looking at the `;
+  hx.fillStyle = 'rgba(231,234,243,.7)'; hx.fillText(t1, L + 16*s, T0 + 58*s);
+  hx.fillStyle = css(CELL_RGB[gazeCell]); hx.fillText(`${SH.names[gazeCell]} wall`, L + 16*s + hx.measureText(t1).width, T0 + 58*s);
+  hx.restore();
+}
+function drawHUD(info, Vw){
+  hx.clearRect(0, 0, hud.width, hud.height);
+  if (layers.shadows) drawShadows(Vw);
+  drawInside(info);
+  if (paused){ pausedTag(paneO); pausedTag(paneI); }
+}
+
+/* ================================================================ sound */
+const sound = {
+  ctx:null, on:false, hum:null, humShape:null,
+  init(){
+    if (this.ctx) return;
+    const AC = window.AudioContext||window.webkitAudioContext; if (!AC) return;
+    const ctx = this.ctx = new AC();
+    this.master = ctx.createGain(); this.master.gain.value = 0; this.master.connect(ctx.destination);
+    const delay = ctx.createDelay(1); delay.delayTime.value = 0.29; const fb = ctx.createGain(); fb.gain.value = 0.42;
+    const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2400; delay.connect(lp); lp.connect(fb); fb.connect(delay);
+    const wet = ctx.createGain(); wet.gain.value = 0.5; lp.connect(wet); wet.connect(this.master);
+    this.fx = ctx.createGain(); this.fx.connect(this.master); this.fx.connect(delay);
+    this.f = ctx.createBiquadFilter(); this.f.type='lowpass'; this.f.frequency.value=320; this.f.Q.value=2;
+    const dg = ctx.createGain(); dg.gain.value=0.12; this.f.connect(dg); dg.connect(this.master);
+    this.oscs = [[1,.5],[1.5,.14],[2.005,.25]].map(([m,g]) => { const o=ctx.createOscillator(); o.frequency.value=55*m; const gg=ctx.createGain(); gg.gain.value=g; o.connect(gg); gg.connect(this.f); o.start(); return {o,m}; });
+  },
+  setOn(on){ this.init(); if (!this.ctx) return; this.on = on; this.ctx.resume?.(); this.master.gain.setTargetAtTime(on?0.7:0, this.ctx.currentTime, 0.4); },
+  drone(spin){ if (!this.ctx) return; const t=this.ctx.currentTime;
+    for (const {o,m} of this.oscs) o.frequency.setTargetAtTime(49*m*(1+spin*0.06), t, 0.3);
+    this.f.frequency.setTargetAtTime(240 + spin*260, t, 0.3); },
+  bell(f, amp, pan){
+    if (!this.ctx || !this.on) return; const ctx=this.ctx, t=ctx.currentTime;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(amp,t+0.005); g.gain.exponentialRampToValueAtTime(0.0001,t+1.8);
+    let out = g; if (ctx.createStereoPanner){ const p=ctx.createStereoPanner(); p.pan.value=pan*0.8; g.connect(p); out=p; }
+    out.connect(this.fx);
+    for (const [m,a] of [[1,1],[2.76,.3],[5.4,.1]]){ const o=ctx.createOscillator(); o.frequency.value=f*m; const og=ctx.createGain(); og.gain.value=a; o.connect(og); og.connect(g); o.start(t); o.stop(t+1.9); }
+  },
+  buildHum(){ // one soft tone per wall: louder when near, muffled when the wall lies in ana or kata
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    if (this.hum) for (const h of this.hum){ h.g.gain.setTargetAtTime(0, t, 0.05); h.o.stop(t + 0.4); }
+    this.hum = poly.cells.map((c, id) => {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = SH.notes[id]/2;
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 600; f.Q.value = 0.7;
+      const g = ctx.createGain(); g.gain.value = 0;
+      o.connect(f); f.connect(g);
+      let p = null; if (ctx.createStereoPanner){ p = ctx.createStereoPanner(); g.connect(p); p.connect(this.master); } else g.connect(this.master);
+      o.start(); return { o, f, g, p };
+    });
+    this.humShape = SH;
+  },
+  updateHum(info){
+    if (!this.ctx || !this.hum) return;
+    if (layers.hum && this.humShape !== SH) this.buildHum();
+    const t = this.ctx.currentTime;
+    for (const w of info){ const h = this.hum[w.id]; if (!h) continue;
+      const prox = clamp(1 - w.gap/0.9, 0, 1);
+      h.g.gain.setTargetAtTime(layers.hum ? prox*prox*0.08 : 0, t, 0.06);
+      h.f.frequency.setTargetAtTime(220 + 2600*w.ins*w.ins, t, 0.06);
+      if (h.p) h.p.pan.setTargetAtTime(clamp(w.nr, -1, 1)*0.85, t, 0.06);
+    }
+  }
+};
+
+/* ================================================================ UI */
+const toastEl = document.getElementById('toast'); let toastT = 0;
+function toast(t){ toastEl.textContent = t; toastEl.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => toastEl.style.opacity = 0, 1300); }
+const planesEl = document.getElementById('planes');
+for (const pl of ['01','02','03','12','13','23']){
+  const b = document.createElement('button'); b.className = 'chip mono'; b.type = 'button'; b.dataset.plane = pl;
+  b.textContent = AX[+pl[0]] + AX[+pl[1]];
+  b.setAttribute('aria-pressed', String(T.planes.has(pl)));
+  b.addEventListener('click', () => { if (T.planes.has(pl)) T.planes.delete(pl); else T.planes.add(pl);
+    b.setAttribute('aria-pressed', String(T.planes.has(pl))); updateStill(); });
+  planesEl.appendChild(b);
+}
+const ro = document.createElement('span'); ro.className = 'readout'; planesEl.appendChild(ro);
+function updateStill(){
+  const ps = [...T.planes];
+  let txt;
+  if (!ps.length || T.w === 0) txt = 'standing still';
+  else if (ps.length === 1){ const st = [0,1,2,3].filter(k => !ps[0].includes(String(k))).map(k => AX[k]).join('');
+    txt = `turning in ${AX[+ps[0][0]]}${AX[+ps[0][1]]} · still plane ${st}`; }
+  else if (ps.length === 2 && new Set((ps[0]+ps[1]).split('')).size === 4) txt = 'double rotation · only the center is still';
+  else txt = `turning in ${ps.length} planes at once`;
+  document.getElementById('stillTxt').textContent = txt;
+  ro.textContent = ps.length === 1 && T.w > 0 ? txt.split('· ')[1] : (ps.length ? 'no still plane' : '');
+}
+document.getElementById('spin').addEventListener('input', e => { T.w = +e.target.value; updateStill(); });
+document.getElementById('speed').addEventListener('input', e => { ball.speed = +e.target.value; const sp = len(ball.v); if (sp > 1e-6) ball.v = ball.v.map(x => x*ball.speed/sp); });
+document.getElementById('kick').addEventListener('click', () => { if (!sound.ctx){ sound.setOn(true); syncSound(); } kick(); });
+const soundBtn = document.getElementById('sound');
+function syncSound(){ soundBtn.textContent = sound.on ? 'Sound on' : 'Sound off'; soundBtn.setAttribute('aria-pressed', String(sound.on)); }
+soundBtn.addEventListener('click', () => { sound.setOn(!sound.on); syncSound(); });
+const MODE_TXT = { free:'free look', prograde:'looking along its path', ride:'riding with the walls', fly:'free fly' };
+function setMode(m){
+  if (m === 'fly' && view.mode !== 'fly'){ flyer.p = ball.p.slice(); flyer.v = [0,0,0,0]; } // leave the ball where it is
+  view.mode = m;
+  document.querySelectorAll('#modes .chip[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
+  document.getElementById('modeTxt').textContent = MODE_TXT[m];
+  document.getElementById('eyesTitle').textContent = m === 'fly' ? 'your eyes' : "the ball's eyes";
+  document.body.classList.toggle('flying', m === 'fly');
+}
+document.querySelectorAll('#modes .chip[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+const linkBtn = document.getElementById('link');
+linkBtn.addEventListener('click', () => { linkViews = !linkViews; linkBtn.setAttribute('aria-pressed', String(linkViews));
+  toast(linkViews ? 'outside view follows your eyes' : 'outside view orbits on its own'); });
+document.querySelectorAll('#shapes .chip').forEach(b => b.addEventListener('click', () => { buildShape(b.dataset.shape); toast(b.dataset.shape === 'hexhex' ? 'hexagon × hexagon' : 'tesseract'); }));
+
+const pauseBtn = document.getElementById('pause'), slowBtn = document.getElementById('slow'), bulletBtn = document.getElementById('bullet');
+function setPaused(v){ paused = v; pauseBtn.setAttribute('aria-pressed', String(v)); }
+pauseBtn.addEventListener('click', () => setPaused(!paused));
+slowBtn.addEventListener('click', () => { slowMo = !slowMo; slowBtn.setAttribute('aria-pressed', String(slowMo)); });
+bulletBtn.addEventListener('click', () => { bullet = !bullet; bulletBtn.setAttribute('aria-pressed', String(bullet)); });
+
+const LAYER_TXT = { shadows:'flat shadows', room:"ball's room", markers:'wall markers', ghost:'ana/kata sight', hum:'wall hum', cone:'view cone', chairs:'chairs' };
+function syncLayers(){ document.querySelectorAll('#layers .chip').forEach(b => b.setAttribute('aria-pressed', String(layers[b.dataset.layer]))); }
+function toggleLayer(k){
+  layers[k] = !layers[k]; syncLayers();
+  if (k === 'hum' && layers.hum){ if (!sound.on){ sound.setOn(true); syncSound(); } if (!sound.hum || sound.humShape !== SH) sound.buildHum(); }
+  toast(`${LAYER_TXT[k]} ${layers[k] ? 'on' : 'off'}`);
+}
+document.querySelectorAll('#layers .chip').forEach(b => b.addEventListener('click', () => toggleLayer(b.dataset.layer)));
+function setCollapsed(v){ document.body.classList.toggle('collapsed', v); }
+document.getElementById('hidePanel').addEventListener('click', () => setCollapsed(true));
+document.getElementById('showPanel').addEventListener('click', () => setCollapsed(false));
+const aboutEl = document.getElementById('about');
+function setAbout(v){ aboutEl.hidden = !v; if (v) document.getElementById('aboutClose').focus(); }
+document.getElementById('aboutBtn').addEventListener('click', () => setAbout(true));
+document.getElementById('aboutClose').addEventListener('click', () => setAbout(false));
+aboutEl.addEventListener('click', e => { if (e.target === aboutEl) setAbout(false); });
+
+/* ================================================================ input */
+const inPane = (p, x, y) => x>=p.x && x<p.x+p.w && y>=p.y && y<p.y+p.h;
+const ptrs = new Map();
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointerdown', e => {
+  if (!sound.ctx){ sound.setOn(true); syncSound(); }
+  canvas.setPointerCapture(e.pointerId);
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY, pane: inPane(paneI,x,y) ? 'I' : 'O', btn:e.button });
+});
+const endPtr = e => ptrs.delete(e.pointerId);
+canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId); if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  const multi = [...ptrs.values()].filter(q => q.pane === p.pane).length;
+  if (p.pane === 'O'){
+    orbit.lastInput = performance.now()/1000;
+    if (multi >= 2){ orbit.dist = clamp(orbit.dist*(1 + dy*0.004), 3.5, 16); return; }
+    if (linkViews){ // grab the shape and turn it: your eyes turn with it
+      if (view.mode === 'prograde'){ setMode('free'); toast('free look'); }
+      const k = 0.0042;
+      if (e.shiftKey || p.btn === 2){ rotPair('F','A', -dx*k); rotPair('U','A', dy*k); }
+      else { rotPair('F','R', -dx*k); rotPair('F','U', dy*k); }
+      orthoFrame();
+    } else { orbit.th -= dx*0.006; orbit.ph = clamp(orbit.ph + dy*0.005, -1.35, 1.35); }
+  } else {
+    if (view.mode === 'prograde'){ setMode('free'); toast('free look'); }
+    const k = 0.0042/(multi||1);
+    if (e.shiftKey || p.btn === 2 || multi >= 2){ rotPair('F','A', dx*k); rotPair('U','A', -dy*k); }
+    else { rotPair('F','R', dx*k); rotPair('F','U', -dy*k); }
+    orthoFrame();
+  }
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (inPane(paneI,x,y)){ if (view.mode==='prograde') setMode('free'); rotPair('F','A', e.deltaY*0.0015); orthoFrame(); }
+  else { orbit.dist = clamp(orbit.dist*Math.exp(e.deltaY*0.001), 3.5, 16); orbit.lastInput = performance.now()/1000; }
+}, { passive:false });
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (e.code === 'Escape' && !aboutEl.hidden){ setAbout(false); return; }
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space'){ e.preventDefault(); kick(); return; }
+  if (e.code === 'KeyP'){ setPaused(!paused); return; }
+  const li = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7'].indexOf(e.code);
+  if (li >= 0){ toggleLayer(LAYER_KEYS[li]); return; }
+  keys.add(e.code);
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+function keyLook(dt){
+  const k = dt*1.3, on = c => keys.has(c), fly = view.mode === 'fly'; let any = false;
+  if (on('ArrowLeft') || (!fly && on('KeyA'))){ rotPair('F','R',-k); any=true; }
+  if (on('ArrowRight') || (!fly && on('KeyD'))){ rotPair('F','R',k); any=true; }
+  if (on('ArrowUp') || (!fly && on('KeyW'))){ rotPair('F','U',k); any=true; }
+  if (on('ArrowDown') || (!fly && on('KeyS'))){ rotPair('F','U',-k); any=true; }
+  if ((!fly && on('KeyE')) || on('KeyC')){ rotPair('F','A',k); any=true; }
+  if ((!fly && on('KeyQ')) || on('KeyZ')){ rotPair('F','A',-k); any=true; }
+  if (any){ if (view.mode==='prograde') setMode('free'); orthoFrame(); }
+}
+function updateFly(dt){ // free fly: move through all four directions, kept inside the shape
+  if (view.mode !== 'fly') return;
+  const on = c => keys.has(c) ? 1 : 0;
+  const f = on('KeyW') - on('KeyS'), r = on('KeyD') - on('KeyA'), u = on('KeyR') - on('KeyF'), a = on('KeyE') - on('KeyQ');
+  const sp = (keys.has('ShiftLeft') || keys.has('ShiftRight')) ? 1.6 : 0.8;
+  const tgt = [0,1,2,3].map(i => (view.F[i]*f + view.R[i]*r + view.U[i]*u + view.A[i]*a)*sp);
+  const kk = 1 - Math.pow(0.002, dt);
+  flyer.v = flyer.v.map((x,i) => x + (tgt[i] - x)*kk);
+  flyer.p = addS(flyer.p, flyer.v, dt);
+  let q = apT(T.R, flyer.p); const lim = B - FLY_R;   // the turning walls push you along
+  for (let pass=0; pass<3; pass++) for (const c of poly.cells){ const sN = dot(c.N, q); if (sN > lim) q = addS(q, c.N, lim - sN); }
+  flyer.p = ap(T.R, q);
+}
+
+/* ================================================================ loop */
+updateStill();
+syncLayers();
+buildShape('tesseract');
+turnFrameTo(nrm([ball.v[0], ball.v[1], ball.v[2], 0]), 10); // face its way, with the fourth axis along w
+if (innerWidth < 700) setCollapsed(true);
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min((now-last)/1000, 0.05); last = now; const t = now/1000;
+  let info = wallInfo();
+  const sdt = dt*timeScale(info);
+  if (sdt > 0){
+    const SUB = 10; for (let i=0;i<SUB;i++) step(sdt/SUB);
+    T.R = orthoRows(T.R);
+    for (let i=0;i<MAXC;i++) flash[i] *= Math.pow(0.02, sdt);
+    flashAll *= Math.pow(0.005, sdt);
+  }
+  keyLook(dt);
+  updateFly(dt);
+  if (view.mode === 'prograde') turnFrameTo(nrm(ball.v), dt*3.2);
+  orthoFrame();
+  const lp = ball.trail[ball.trail.length-1];
+  if (!lp || len(sub(lp, ball.p)) > 0.004){ ball.trail.push(ball.p.slice()); if (ball.trail.length > TRAIL_N) ball.trail.shift(); }
+  info = wallInfo();
+  gazeCell = exitCell(view.F);
+  ghostAmt += ((layers.ghost ? 1 : 0) - ghostAmt)*(1 - Math.pow(0.002, dt));
+  sound.drone(T.planes.size && !paused ? T.w : 0);
+  sound.updateHum(info);
+
+  const Vw = poly.V.map(v => ap(T.R, v));
+  updateOutside(dt, t, Vw);
+  uI.uP.value.set(...eye()); uI.uR.value.set(...view.R); uI.uU.value.set(...view.U); uI.uF.value.set(...view.F); uI.uA.value.set(...view.A);
+  const Rt = T.R; uI.uRt.value.set(Rt[0],Rt[4],Rt[8],Rt[12], Rt[1],Rt[5],Rt[9],Rt[13], Rt[2],Rt[6],Rt[10],Rt[14], Rt[3],Rt[7],Rt[11],Rt[15]);
+  for (let i=0;i<MAXC;i++) uI.uFlash.value[i] = flash[i];
+  uI.uFlashAll.value = flashAll; uI.uFlashCol.value.set(...flashCol); uI.uTime.value = t; uI.uGhost.value = ghostAmt;
+  uI.uBall.value.set(...ball.p); uI.uBallR.value = view.mode === 'fly' ? RB : 0; uI.uChair.value = layers.chairs ? 1 : 0;
+
+  renderer.setScissorTest(false); renderer.clear();
+  renderer.setScissorTest(true);
+  let r = glRect(paneO); renderer.setViewport(...r); renderer.setScissor(...r); renderer.render(sceneO, camO);
+  r = glRect(paneI); renderer.setViewport(...r); renderer.setScissor(...r);
+  uI.uRect.value.set(r[0]*DPR, r[1]*DPR, r[2]*DPR, r[3]*DPR);
+  renderer.render(sceneI, camI);
+  drawHUD(info, Vw);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+
+</html>
