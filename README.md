@@ -2,6 +2,8 @@
 
 **Play it:** https://erenciracioglu-dotcom.github.io/Tesseracting/
 
+![Tesseracting, paused: on the left the turning tesseract with the ball's room outlined in white and its view cone painted on the walls; on the right the ball's own view of the walls around it](screenshot.png)
+
 A small toy for feeling your way around four dimensions. A ball bounces weightless inside a tesseract that turns in a plane (in 4D things turn around a plane, not an axis). You watch it two ways at once: from outside, as the tesseract's 3D shadow, and through the ball's own eyes, which only ever see a 3D slice of the 4D world.
 
 It opens as a plain turning tesseract. The switches underneath add one idea at a time.
