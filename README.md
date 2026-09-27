@@ -10,6 +10,8 @@ It opens as a plain turning tesseract. The switches underneath add one idea at a
 
 Best on a desktop browser with a mouse; touch works too.
 
+Its sibling is [Hyperwell](https://github.com/erenciracioglu-dotcom/Hyperwell), a falling-block puzzle in four dimensions.
+
 ## Controls
 
 - Drag either view to look around. Shift-drag (or right-drag) turns your view into the fourth direction.
